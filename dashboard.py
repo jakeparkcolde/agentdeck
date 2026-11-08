@@ -8,6 +8,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 import signal
 import threading
 import time
@@ -26,6 +27,7 @@ from games import Games
 from config import CFG
 import parcels
 import parcels_import
+import web_credits
 import updater
 import intro
 from sfx import ambient, play
@@ -35,6 +37,7 @@ from mole import MOLE_HOSTS, dryrun_info, empty_trash, mole_status, refresh_dryr
 from machines import MACHINES
 from worktrees import Worktree, ask_tower, open_in_herdr, remove_worktree, worktrees
 from pomodoro import PRESETS, Pomodoro, notify_done
+from remote_agy import HOST as AGY_HOST
 from remote_agy import agy_quota
 from remote_herdr import (TOWER_SPACE, StudioState, TowerMeta, Workspace, alert_keys, apply_ack, focus,
                           studio_state, tower_meta, tower_split, unzoom_pane, zoom_pane)
@@ -47,6 +50,9 @@ W5, WEEK = timedelta(hours=5), timedelta(days=7)
 HOME_PAGE = 0  # 홈: 페이지 바로가기 + 업데이트 내용 (켜질 때 인트로 뒤, 가운데 버튼 짧게)
 CLOCK_PAGES = (HOME_PAGE, 1, 2, 4)  # 넓은 칸이 시계인 페이지 (업데이트 단추 역할도 함)
 PARCELS_ON = bool((CFG.get("parcels") or {}).get("enabled"))  # 택배(해외 직구) 도착 예상 페이지
+# 웹으로만 보이는 크레딧 (한도 표에서 LLM 다음 열): 이름, 색
+WEB_CREDITS = [(k, n, c) for k, n, c in (("flow", "FLOW", "#4285f4"), ("higgsfield", "HIGGS", "#c6f432"))
+               if (CFG.get(k) or {}).get("enabled")]
 PAGES = 9 if PARCELS_ON else 8
 GAME_PAGE = 7  # 게임: 두더지 잡기 · 순서 기억
 PARCEL_PAGE = 8 if PARCELS_ON else -1  # 택배 (게임 다음)
@@ -84,13 +90,18 @@ def collect_llms(pool: ThreadPoolExecutor) -> list[LLM]:
     codex = LLM("CODEX", "#10a37f", week=lim(xu.primary.used_percent, xu.primary.resets_at, WEEK))
     if xu.secondary.used_percent is not None:
         codex.five = lim(xu.secondary.used_percent, xu.secondary.resets_at, W5)
+    out = [claude]
+    if Path(f"{Path.home()}/.codex").exists():  # Codex 를 한 번도 안 쓴 맥이면 칸을 빼고 앞으로 당긴다
+        out.append(codex)
+    if not AGY_HOST:  # agy 주소를 설정하지 않았으면 표시 안 함
+        return out
     agy = LLM("AGY", "#7aa2f7")
     for b in ag or []:
         if b.window == "5h":
             agy.five = Limit(b.remaining, b.reset, W5)
         elif b.window == "weekly":
             agy.week = Limit(b.remaining, b.reset, WEEK)
-    return [claude, codex, agy]
+    return out + [agy]
 
 
 class LoggingPool(ThreadPoolExecutor):
@@ -154,6 +165,7 @@ class Dashboard:
         self.parcels: list = []  # 택배 목록 (parcels.Parcel)
         self.parcels_at = 0.0
         self.parcels_import_at = time.time()  # 켜자마자 가져오지는 않음 (3시간 뒤부터)
+        self.credits_at = 0.0
         self.parcel_sel: int | None = None  # 고른 택배 (넓은 칸에 이동 기록)
         self.parcel_off = 0  # 9개 넘으면 넘겨 보기
         self.game_thread: threading.Thread | None = None
@@ -397,6 +409,15 @@ class Dashboard:
         self.parcels = parcels.grouped(parcels.refresh(force))
         self.parcels_at = time.time()
         if self.page == PARCEL_PAGE:
+            self.render()
+
+    def refresh_credits(self) -> None:
+        for key, _, _ in WEB_CREDITS:
+            try:
+                web_credits.run(key)
+            except BaseException as e:  # 로그인 만료 등: 로그만 남기고 마지막 값 유지
+                print(f"{datetime.now():%H:%M:%S} {key} credits: {e}", flush=True)
+        if self.page == 2:
             self.render()
 
     def import_parcels(self) -> None:
@@ -799,7 +820,7 @@ class Dashboard:
             if self.page == 1:
                 body = page_summary(self.llms, self.studio, now, self.blink_on)
             elif self.page == 2:
-                body = page_grid(self.llms, now)
+                body = page_grid(self.llms, now, [(n, c, d) for k, n, c in WEB_CREDITS if (d := web_credits.load(k))])
             elif self.page == 3:
                 body = page_studio(self.studio, self.blink_on, self.studio_row(), self.tower_meta)
             elif self.page == 4:
@@ -870,6 +891,9 @@ class Dashboard:
             if PARCELS_ON and parcels_import.PROFILE.exists() and time.time() - self.parcels_import_at > 3 * 3600:
                 self.parcels_import_at = time.time()  # 3시간마다 알리 주문 다시 가져오기 (전용 프로필로 화면 없이)
                 self.pool.submit(self.import_parcels)
+            if WEB_CREDITS and time.time() - self.credits_at > web_credits.POLL_SEC:
+                self.credits_at = time.time()  # 30분마다 Flow·Higgsfield 크레딧 (전용 프로필로 화면 없이)
+                self.pool.submit(self.refresh_credits)
             if PARCELS_ON and (time.time() - self.parcels_at > parcels.POLL_SEC or
                                (self.page == PARCEL_PAGE and time.time() - self.parcels_at > 300)):
                 self.parcels_at = time.time()

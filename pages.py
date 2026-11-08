@@ -104,7 +104,7 @@ def llm_tile(m: LLM) -> Button:
 
 
 def page_summary(llms: list[LLM], studio: StudioState, now: datetime, blink_on: bool = False) -> dict[int, Button]:
-    p: dict[int, Button] = {}
+    p: dict[int, Button] = {i: Button(bg=BG) for i in (0, 1, 2, 5, 6, 7)}  # 안 쓰는 LLM 자리는 빈 칸
     for i, m in enumerate(llms[:3]):
         p[i] = llm_tile(m)
     # 추천: 가장 여유 있는 LLM
@@ -146,9 +146,36 @@ def page_summary(llms: list[LLM], studio: StudioState, now: datetime, blink_on: 
 
 
 # ---------- 페이지 2: 한도 그리드 (열 = LLM, 1줄 5H, 2줄 주간) ----------
-def page_grid(llms: list[LLM], now: datetime) -> dict[int, Button]:
+def credit_tiles(name: str, color: str, d: dict, now: datetime) -> tuple[Button, Button]:
+    """웹 크레딧 서비스(Flow, Higgsfield): 위 칸 = 남은 크레딧, 아래 칸 = 요금제와 마지막 확인 시각."""
+    reset = datetime.fromisoformat(d["reset"]) if d.get("reset") else None
+    credits, total = d.get("credits"), d.get("total")
+    if reset:
+        sub = f"리셋 {until(reset, now)}"
+    elif total:
+        sub = f"/ {total:,}"
+    else:
+        sub = "리셋 정보 없음"
+    top = Button(header=f"{name} 크레딧", title="-" if credits is None else f"{credits:,}", sub=sub, bg=BG,
+                 accent=color, ratio=(credits / total) if credits is not None and total else None)
+    checked = datetime.fromisoformat(d["checked"]) if d.get("checked") else None
+    stale = checked is None or (now - checked).total_seconds() > 3 * 3600
+    bottom = Button(header=f"{name} 요금제", title=d.get("tier") or "-",
+                    sub=("갱신 " + checked.strftime("%H:%M")) if checked else "확인 전",
+                    bg=BG, accent=DIM if stale else color)
+    return top, bottom
+
+
+def page_grid(llms: list[LLM], now: datetime, credits: list[tuple[str, str, dict]] | None = None) -> dict[int, Button]:
+    """LLM 한 개당 한 열(5H/주간), 그 뒤에 웹 크레딧 서비스 한 개당 한 열."""
     p: dict[int, Button] = {}
+    for k, (name, color, d) in enumerate(credits or []):
+        col = len(llms) + k
+        if col < 5:
+            p[col], p[5 + col] = credit_tiles(name, color, d, now)
     for col in range(5):
+        if col in p:
+            continue
         m = llms[col] if col < len(llms) else None
         for row, attr, label in ((0, "five", "5H"), (1, "week", "주간")):
             idx = row * 5 + col

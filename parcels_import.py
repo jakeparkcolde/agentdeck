@@ -18,6 +18,7 @@ import re
 import shutil
 import subprocess
 import sys
+import threading
 import time
 import urllib.request
 from datetime import date
@@ -35,6 +36,7 @@ CHROME = ["/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
 MAX_ORDERS = 40
 MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 DAYS = 60  # 최근 이 기간 주문만
+BROWSER_LOCK = threading.Lock()  # 전용 브라우저는 한 번에 한 작업만 (택배·Flow 크레딧이 같이 씀)
 
 # 주문 목록에서 주문 카드 읽기 (누르는 단추는 '주문 더 보기' 하나뿐)
 LIST_JS = r'''(async (days) => {
@@ -87,7 +89,7 @@ def _alive() -> str | None:
         return None
 
 
-def launch(headless: bool) -> subprocess.Popen | None:
+def launch(headless: bool, url: str = ORDERS_URL) -> subprocess.Popen | None:
     """전용 프로필로 Chrome 실행 (이미 떠 있으면 그대로 씀)."""
     if _alive():
         return None
@@ -96,7 +98,7 @@ def launch(headless: bool) -> subprocess.Popen | None:
             "--remote-debugging-address=127.0.0.1", "--no-first-run", "--no-default-browser-check"]
     if headless:
         args += ["--headless=new", "--window-size=1400,1000"]
-    proc = subprocess.Popen(args + ([ORDERS_URL] if not headless else []),
+    proc = subprocess.Popen(args + ([url] if not headless else []),
                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     for _ in range(40):
         if _alive():
@@ -227,12 +229,13 @@ def _parse(o: dict) -> dict:
 
 
 def run() -> list[dict]:
-    proc = launch(headless=True)
-    try:
-        raw = asyncio.run(_collect())
-    finally:
-        if proc:
-            proc.terminate()
+    with BROWSER_LOCK:
+        proc = launch(headless=True)
+        try:
+            raw = asyncio.run(_collect())
+        finally:
+            if proc:
+                proc.terminate()
     got = [_parse(o) for o in raw]
     with parcels._lock:
         ps = parcels.load()

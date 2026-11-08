@@ -20,6 +20,7 @@
    - [게임 (7페이지)](#47-게임-7페이지)
    - [멍때리기 화면보호기](#48-멍때리기-화면보호기-어항--불멍--비멍--바다)
    - [알리 택배 도착 예상](#49-알리-택배-도착-예상-선택)
+   - [Flow · Higgsfield 크레딧](#410-flow--higgsfield-크레딧-선택)
 5. [설정 파일 전체 설명](#5-설정-파일-전체-설명)
 6. [문제 해결](#6-문제-해결)
 7. [제거하기](#7-제거하기)
@@ -127,7 +128,8 @@ cp config.example.json config.json
 - **Claude · Codex · agy**의 남은 한도를 5시간 기준과 주간 기준으로 보여줘요. 큰 숫자는 둘 중 **더 빠듯한 쪽**이에요.
 - **페이스**: 한도를 시간보다 빨리 쓰고 있는지 알려줘요. 예를 들어 주간 한도의 50%를 썼는데 일주일 중 30%밖에 안 지났다면 "과속"이에요.
 - **지금 쓰기 좋은**: 가장 여유 있는 LLM을 추천해요.
-- **2페이지**는 같은 정보를 표처럼 보여줘요. 열은 LLM, 윗줄은 5시간, 아랫줄은 주간이에요.
+- **2페이지**는 같은 정보를 표처럼 보여줘요. 열은 LLM, 윗줄은 5시간, 아랫줄은 주간이에요. 켜 두면 그 뒤 열에 [Flow · Higgsfield 크레딧](#410-flow--higgsfield-크레딧-선택)도 나와요.
+- **안 쓰는 서비스는 칸이 빠져요.** Codex 폴더(`~/.codex`)가 없거나 `agy` 설정이 없으면 그 열을 빼고 앞으로 당겨요. Claude만 써도 화면이 비어 보이지 않아요.
 
 **켜는 방법**
 
@@ -329,6 +331,22 @@ python3 scripts/install-hooks.py --codex   # Codex도 함께 (기존 notify 설�
 - 안전: 비밀번호는 저장하지도 입력하지도 않아요. 브라우저 접속은 이 맥 안(127.0.0.1)에서만 하고, 주문 페이지에서는 **"주문 더 보기" 단추만** 눌러요(배송 완료 확인·취소 등은 누르지 않음). 가져온 내용은 `~/.cache/d200/parcels.json`에만 저장돼요.
 - 운송장을 직접 넣을 수도 있어요: `.venv/bin/python parcels.py add <운송장> "상품 이름"`.
 
+### 4.10 Flow · Higgsfield 크레딧 (선택)
+
+Google Flow와 Higgsfield는 남은 크레딧을 **웹 화면에서만** 보여줘요. 켜 두면 2페이지 한도 표의 LLM 다음 열에 나와요.
+
+- **윗칸**: 남은 크레딧. Flow는 초기화까지 남은 시간, Higgsfield는 월 한도 대비 막대를 같이 보여줘요.
+- **아랫칸**: 요금제 이름과 마지막으로 읽은 시각. 3시간 넘게 못 읽으면 회색으로 바뀌어요.
+
+**켜는 방법**
+1. `config.json`에 쓰는 서비스만 켜요: `"flow": {"enabled": true}`, `"higgsfield": {"enabled": true}`.
+2. **처음 한 번 로그인**: `.venv/bin/python web_credits.py login flow` (Higgsfield는 `login higgsfield`). 덱 전용 Chrome 창이 열리면 직접 로그인하고 창을 닫아요. 택배 기능과 같은 전용 프로필(`~/.cache/d200/ali-browser`)을 써서, 한쪽에서 구글로 로그인했다면 다른 쪽도 이미 로그인돼 있을 수 있어요.
+3. 대시보드를 다시 시작하면 **30분마다 화면 없이** 읽어 와요. 바로 확인하려면 `.venv/bin/python web_credits.py`.
+
+- 안전: 비밀번호는 저장하지도 입력하지도 않아요. 브라우저 접속은 이 맥 안(127.0.0.1)에서만 해요. Flow는 계정 단추를 눌러 크레딧 칸만 읽고, Higgsfield는 구독 설정 화면 글자만 읽어요. 로그아웃·구매 같은 단추는 누르지 않아요.
+- 저장하는 값은 크레딧 수, 월 한도, 초기화 시각, 요금제 이름뿐이에요(`~/.cache/d200/flow.json`, `higgsfield.json`). 이메일·이름은 저장하지 않아요.
+- ⚠️ 공식 API가 아니라 웹 화면을 읽는 방식이라, 사이트 화면이 바뀌면 못 읽을 수 있어요. 그러면 마지막 값이 회색으로 남아요.
+
 ## 5. 설정 파일 전체 설명
 
 `config.json` 하나로 모든 기능을 설정해요. **적지 않은 기능은 꺼집니다.** 바꾼 뒤에는 대시보드를 다시 시작하세요.
@@ -340,6 +358,8 @@ python3 scripts/install-hooks.py --codex   # Codex도 함께 (기존 notify 설�
   "screensaver_scene": "aqua",  // 화면보호기 장면: aqua · fire · rain · beach, alternate = 켜질 때마다 차례로
   "sound": {"enabled": false, "volume": 0.6},  // 효과음·배경음 (덱이 연결된 맥 스피커)
   "parcels": {"enabled": false},  // 알리 택배 도착 예상 페이지
+  "flow": {"enabled": false},       // Google Flow 남은 크레딧 (2페이지)
+  "higgsfield": {"enabled": false}, // Higgsfield 남은 크레딧 (2페이지)
   "aquarium_fish": 14,          // 어항 물고기 수
   "agent_source": "hooks",      // 에이전트 현황 방식: "hooks" 또는 "herdr"
   "hooks": {

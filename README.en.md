@@ -47,7 +47,7 @@ A macOS dashboard that drives the Ulanzi D200 directly, without the vendor app
 <td width="50%" valign="top">
 
 ### 1 · Remaining LLM quota
-**5-hour and weekly quota left** for Claude, Codex and agy, usage **pace** (too fast / on track / ahead), the best LLM right now, next reset
+**5-hour and weekly quota left** for Claude, Codex and agy (optional: Google Flow · Higgsfield credits), usage **pace** (too fast / on track / ahead), the best LLM right now, next reset
 
 <sub>→ [Guide: LLM quota](docs/GUIDE.en.md#41-remaining-llm-quota-pages-1-2)</sub>
 

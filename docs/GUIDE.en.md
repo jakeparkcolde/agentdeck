@@ -20,6 +20,7 @@ You don't have to turn everything on. **LLM quotas and the pomodoro work right a
    - [Games (page 7)](#47-games-page-7)
    - [Chill screensavers](#48-chill-screensavers-aquarium--fire--rain--beach)
    - [AliExpress parcel ETAs](#49-aliexpress-parcel-etas-optional)
+   - [Flow · Higgsfield credits](#410-flow--higgsfield-credits-optional)
 5. [Full config reference](#5-full-config-reference)
 6. [Troubleshooting](#6-troubleshooting)
 7. [Uninstall](#7-uninstall)
@@ -127,7 +128,8 @@ It now starts at login and restarts within 15 seconds if it stops. Unplugging an
 - Remaining quota for **Claude, Codex and agy**, both the 5-hour and weekly windows. The big number is whichever is **tighter**.
 - **Pace** tells you whether you're spending faster than time passes. If you've used 50% of the weekly quota but only 30% of the week has gone by, you're "too fast".
 - **Best now** recommends the LLM with the most room.
-- **Page 2** shows the same data as a grid: columns are LLMs, top row 5-hour, bottom row weekly.
+- **Page 2** shows the same data as a grid: columns are LLMs, top row 5-hour, bottom row weekly. If enabled, [Flow · Higgsfield credits](#410-flow--higgsfield-credits-optional) follow in the next columns.
+- **Services you don't use are hidden.** If there is no Codex folder (`~/.codex`) or no `agy` setting, that column is dropped and the rest shift left, so a Claude-only setup doesn't look empty.
 
 **How to enable**
 
@@ -329,6 +331,22 @@ Set `"parcels": {"enabled": true}` in `config.json` to add a **parcels page** af
 - Safety: no password is stored or typed by the program. It only talks to the browser on this Mac (127.0.0.1) and only presses the **"View orders / load more"** button on the orders page (never confirm-received or cancel). Data stays in `~/.cache/d200/parcels.json`.
 - You can also add a tracking number by hand: `.venv/bin/python parcels.py add <tracking> "item name"`.
 
+### 4.10 Flow · Higgsfield credits (optional)
+
+Google Flow and Higgsfield only show remaining credits **on their websites**. When enabled, they appear on page 2 in the columns after your LLMs.
+
+- **Top tile**: credits left. Flow also shows time until reset; Higgsfield shows a bar against the monthly allowance.
+- **Bottom tile**: plan name and when it was last read. It turns grey if it could not be read for over 3 hours.
+
+**How to enable**
+1. Turn on only the services you use in `config.json`: `"flow": {"enabled": true}`, `"higgsfield": {"enabled": true}`.
+2. **Log in once**: `.venv/bin/python web_credits.py login flow` (or `login higgsfield`). A dedicated Chrome window opens; sign in yourself and close it. It shares the parcels feature's dedicated profile (`~/.cache/d200/ali-browser`).
+3. Restart the dashboard; credits are read **headlessly every 30 minutes**. Run `.venv/bin/python web_credits.py` to read now.
+
+- Safety: no password is stored or typed by the program. It only talks to the browser on this Mac (127.0.0.1). For Flow it opens the account panel and reads the credits line; for Higgsfield it only reads the subscription settings page text. It never presses sign-out, purchase or upgrade buttons.
+- Only the credit count, monthly allowance, reset time and plan name are saved (`~/.cache/d200/flow.json`, `higgsfield.json`). No email or name.
+- ⚠️ This reads web pages rather than an official API, so a site redesign can break it. The last value then stays, greyed out.
+
 ## 5. Full config reference
 
 Everything lives in `config.json`. **Anything you leave out is turned off.** Restart the dashboard after editing.
@@ -340,6 +358,8 @@ Everything lives in `config.json`. **Anything you leave out is turned off.** Res
   "screensaver_scene": "aqua",  // screensaver scene: aqua · fire · rain · beach, or alternate
   "sound": {"enabled": false, "volume": 0.6},  // sound effects and ambience on the Mac speaker
   "parcels": {"enabled": false},  // AliExpress parcel ETA page
+  "flow": {"enabled": false},       // Google Flow credits (page 2)
+  "higgsfield": {"enabled": false}, // Higgsfield credits (page 2)
   "aquarium_fish": 14,          // number of fish in the aquarium
   "agent_source": "hooks",      // agent view: "hooks" or "herdr"
   "hooks": {

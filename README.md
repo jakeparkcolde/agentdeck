@@ -47,7 +47,7 @@ Ulanzi D200을 공식 앱 없이 직접 제어하는 macOS 대시보드
 <td width="50%" valign="top">
 
 ### 1 · LLM 남은 한도
-Claude · Codex · agy의 **5시간 / 주간 남은 한도**, 시간 대비 **페이스**(과속 / 적정 / 여유), 지금 쓰기 좋은 LLM, 다음 리셋
+Claude · Codex · agy의 **5시간 / 주간 남은 한도**(선택: Google Flow · Higgsfield 크레딧), 시간 대비 **페이스**(과속 / 적정 / 여유), 지금 쓰기 좋은 LLM, 다음 리셋
 
 <sub>→ [가이드: LLM 한도](docs/GUIDE.md#41-llm-남은-한도-12페이지)</sub>
 
