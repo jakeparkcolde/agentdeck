@@ -337,7 +337,7 @@ Set `"parcels": {"enabled": true}` in `config.json` to add a **parcels page** af
 
 Google Flow and Higgsfield only show remaining credits **on their websites**. When enabled, they appear on page 2 in the columns after your LLMs.
 
-- **Top tile**: credits left. Flow also shows time until reset; Higgsfield shows a bar against the monthly allowance.
+- **Top tile**: credits left and time until reset. Higgsfield also shows a bar against the monthly allowance. Higgsfield only shows the plan renewal date, so the monthly refill is assumed to fall on that day of each month (or the last day of shorter months).
 - **Bottom tile**: plan name and when it was last read. It turns grey if it could not be read for over 3 hours.
 
 **How to enable**

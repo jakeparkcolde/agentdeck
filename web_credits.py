@@ -16,6 +16,7 @@
 from __future__ import annotations
 
 import asyncio
+import calendar
 import json
 import re
 import subprocess
@@ -108,8 +109,30 @@ def parse_higgsfield(raw: dict, now: datetime) -> dict:
         m = re.search(r"([\d.,]+)\s*credits left", text, re.I)
         left = _num(m[1]) if m else None
     plan = re.search(r"\b(\w+) Plan\b", text)
+    reset = _higgs_refill(text, now)
     return {"credits": None if left is None else int(left), "total": None if total is None else int(total),
-            "reset": None, "tier": plan[1][:12] if plan else ""}
+            "reset": reset.isoformat() if reset else None, "tier": plan[1][:12] if plan else ""}
+
+
+def _higgs_refill(text: str, now: datetime) -> datetime | None:
+    """'Your plan renews June 30, 2027' → 다음 월 크레딧 충전 시각 (추정).
+
+    화면에는 갱신일만 나온다. 월간 크레딧은 갱신일과 같은 날짜에 매달 채워진다고 보고,
+    지금 이후 가장 가까운 그 날짜(달에 그 날이 없으면 말일)를 돌려준다. 연간 요금제도 같은 방식.
+    """
+    m = re.search(r"renews\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\.?\s+(\d{1,2}),?\s+(\d{4})", text, re.I)
+    if not m:
+        return None
+    renew = datetime(int(m[3]), browser.MONTHS.index(m[1].title()) + 1, int(m[2]))
+    now = now.replace(tzinfo=None)
+    y, mo = now.year, now.month
+    for _ in range(14):
+        last = calendar.monthrange(y, mo)[1]
+        when = datetime(y, mo, min(renew.day, last))
+        if when > now:
+            return min(when, renew).astimezone()
+        y, mo = (y + 1, 1) if mo == 12 else (y, mo + 1)
+    return None
 
 
 PARSERS = {"flow": parse_flow, "higgsfield": parse_higgsfield}
