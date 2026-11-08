@@ -18,7 +18,7 @@ agy -p /usage --output-format json
 - 먼저 `agy --version` 으로 1.1.11 이상인지 확인해요. 옛 버전은 `/usage` 를 프롬프트로 처리해 한도를 쓸 수 있어서 실행하지 않아요.
 - 토큰 파일을 읽거나 비공개 API 를 부르지 않아요.
 - CLI 가 없거나, 로그인이 안 됐거나, 시간이 초과되면 한도를 "없음"으로 표시해요. 모르는 시간 창이나 이상한 항목은 그것만 건너뛰어요.
-- 대시보드는 5시간·주간 창만 그려요. 모델 그룹이 여럿이면 같은 창 중 마지막 그룹 값을 보여줘요.
+- 대시보드는 5시간·주간 창만 그려요. 모델 그룹이 여럿이면 창마다 **가장 빠듯한(남은 게 적은) 그룹** 값을 보여줘요.
 
 ## English
 
@@ -34,4 +34,4 @@ agentdeck connects over SSH to the computer running agy and reads quota with the
 - `agy --version` is checked first; older CLIs may treat `/usage` as a prompt, so they are skipped.
 - No credential files or private endpoints are used.
 - Missing CLI, no login or timeouts show the quota as unavailable. Unknown windows or malformed entries are skipped individually.
-- Only the 5-hour and weekly windows are drawn; with several model groups, the last group's value for each window is shown.
+- Only the 5-hour and weekly windows are drawn; with several model groups, each window shows the **tightest** (least remaining) group.

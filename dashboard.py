@@ -96,10 +96,10 @@ def collect_llms(pool: ThreadPoolExecutor) -> list[LLM]:
     if not AGY_HOST:  # agy 주소를 설정하지 않았으면 표시 안 함
         return out
     agy = LLM("AGY", "#7aa2f7")
-    for b in ag or []:
-        if b.window == "5h":
+    for b in ag or []:  # 모델 그룹이 여럿이면 창마다 가장 빠듯한(남은 게 적은) 그룹을 보여준다
+        if b.window == "5h" and (agy.five is None or b.remaining < agy.five.remaining):
             agy.five = Limit(b.remaining, b.reset, W5)
-        elif b.window == "weekly":
+        elif b.window == "weekly" and (agy.week is None or b.remaining < agy.week.remaining):
             agy.week = Limit(b.remaining, b.reset, WEEK)
     return out + [agy]
 

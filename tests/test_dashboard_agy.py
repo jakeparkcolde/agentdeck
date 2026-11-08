@@ -32,18 +32,17 @@ class DashboardQuotaTests(unittest.TestCase):
              ThreadPoolExecutor(max_workers=2) as pool:
             return self.dashboard.collect_llms(pool)
 
-    def test_fixture_reaches_dashboard_with_existing_group_policy(self):
+    def test_fixture_reaches_dashboard_showing_tightest_group(self):
         payload = json.loads((Path(__file__).parent / "fixtures/agy_quota.json").read_text())
         llms = self.collect(remote_agy.parse_quota(payload))
         agy = llms[2]
         self.assertEqual(agy.name, "AGY")
-        # The later model's 5h bucket remains the dashboard's displayed value.
-        self.assertEqual(agy.five.remaining, 1.0)
-        self.assertIsNone(agy.five.reset)
+        # 모델 그룹이 여럿이면 창마다 가장 빠듯한 그룹(여기서는 A 의 5h = 0)을 보여준다
+        self.assertEqual(agy.five.remaining, 0.0)
         self.assertEqual(agy.week.remaining, .75)
         self.assertEqual(agy.week.reset.isoformat(), "2030-01-07T12:00:00+00:00")
         grid = self.pages.page_grid(llms, datetime(2030, 1, 1, tzinfo=timezone.utc))
-        self.assertEqual((grid[2].title, grid[7].title), ("100%", "75%"))
+        self.assertEqual((grid[2].title, grid[7].title), ("0%", "75%"))
 
     def test_exhausted_quota_remains_zero_in_summary_and_grid(self):
         payload = {"status": "SUCCESS", "command": {"data": {"groups": [
