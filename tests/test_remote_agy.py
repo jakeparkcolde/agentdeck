@@ -50,6 +50,15 @@ class ParseTests(unittest.TestCase):
                     self.assertIsNone(agy.parse_quota(quota([
                         {"name": "A", "buckets": [bucket]}])))
 
+    def test_bad_bucket_does_not_hide_good_ones(self):
+        good = {"window": "weekly", "remaining_fraction": .5}
+        for bad in [{"window": "daily", "remaining_fraction": .1}, {"window": "5h", "remaining_fraction": 2},
+                    {"window": "5h", "remaining_fraction": 0, "reset_time": "bad"}, None]:
+            with self.subTest(bad=bad):
+                got = agy.parse_quota(quota([{"name": "A", "buckets": [bad, good]},
+                                             {"name": "", "buckets": [good]}, None]))
+                self.assertEqual(got, [agy.Bucket("A", "weekly", .5, None)])
+
     def test_missing_null_disabled_are_not_zero(self):
         for bucket in [{}, {"remaining_fraction": None},
                        {"remaining_fraction": 0, "enabled": False},
@@ -125,7 +134,7 @@ class RemoteScriptTests(unittest.TestCase):
         return 0, output.getvalue(), run
 
     def test_supported_cli_and_noninteractive_path(self):
-        for version in ["1.1.11", "agy v1.2.15\n", "1.5.3", "v2.0.0"]:
+        for version in ["1.1.11", "agy v1.2.15\n", "1.5.3", "v2.0.0", "agy version 1.6.0\n", "1.5.3 (build abc)\n"]:
             code, output, run = self.execute([
                 subprocess.CompletedProcess([], 0, version),
                 subprocess.CompletedProcess([], 0, json.dumps(FIXTURE))])
@@ -140,7 +149,7 @@ class RemoteScriptTests(unittest.TestCase):
             self.assertIn("/.local/bin:", kwargs["env"]["PATH"])
 
     def test_old_unknown_cli_never_runs_usage(self):
-        for version in ["1.1.10", "0.9.0", "unknown", "1.2.15-preview", ""]:
+        for version in ["1.1.10", "0.9.0", "unknown", "1.2.15-preview", "", "1.2.15.4"]:
             code, output, run = self.execute([subprocess.CompletedProcess([], 0, version)])
             self.assertEqual((code, output, run.call_count), (1, "", 1))
 

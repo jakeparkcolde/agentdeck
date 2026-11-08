@@ -154,7 +154,7 @@ It now starts at login and restarts within 15 seconds if it stops. Unplugging an
 > Claude numbers refresh only while you use Claude Code; otherwise the last value stays.
 > ⚠️ The Codex lookup uses undocumented internal endpoints and may change at any time.
 
-agy uses the official CLI JSON command over SSH. It requires CLI 1.1.11+ and an existing authenticated installation; failures leave quota unavailable. **Local CLI execution and live SSH collection/parsing passed with agy 1.5.3; dashboard integration and Korean/English rendering also passed; physical D200 validation was unavailable because no device was present**; see [details](ANTIGRAVITY.md).
+agy runs the official read-only CLI command over SSH. The remote computer needs **agy CLI 1.1.11+ installed and signed in**; on failure the quota shows as unavailable. See [Antigravity quota](ANTIGRAVITY.md) for requirements.
 
 ### 4.2 Agent activity (page 3)
 

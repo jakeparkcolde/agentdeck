@@ -1,7 +1,8 @@
-"""Fetch Antigravity quota through its official read-only CLI over SSH.
+"""agy(Antigravity CLI)를 쓰는 컴퓨터에서 할당량을 SSH 로 가져온다.
 
-No credential files or private endpoints are accessed by agentdeck. See
-docs/ANTIGRAVITY.md for the payload contract and live validation limits.
+원격에는 아무것도 설치하지 않는다: 아래 REMOTE 스크립트를 ssh stdin 으로 넘겨 공식 읽기 전용 명령
+`agy -p /usage --output-format json` 을 실행한다. 토큰 파일이나 비공개 API 는 쓰지 않는다.
+요구 사항은 docs/ANTIGRAVITY.md 참고.
 """
 
 from __future__ import annotations
@@ -14,10 +15,9 @@ from datetime import datetime, timezone
 
 from config import AGY_HOST
 
-HOST = AGY_HOST
+HOST = AGY_HOST  # agy 를 쓰는 컴퓨터의 ssh 대상 (config.json agy.host), 없으면 비활성
 
-# Keep the existing remote Python transport and installation search paths.
-# Version-gate before /usage: older CLIs could interpret slash commands as prompts.
+# /usage 를 지원하는 버전(1.1.11+)인지 먼저 확인한다: 옛 CLI 는 슬래시 명령을 프롬프트로 처리해 한도를 쓸 수 있다.
 REMOTE = r'''
 import os, re, subprocess, sys
 
@@ -25,7 +25,8 @@ env = dict(os.environ, PATH=os.path.expanduser("~/.local/bin") + ":/opt/homebrew
 try:
     version = subprocess.run(["agy", "--version"], stdin=subprocess.DEVNULL,
         capture_output=True, text=True, timeout=10, env=env, check=True)
-    match = re.fullmatch(r"(?:agy\s+)?v?(\d+)\.(\d+)\.(\d+)\s*", version.stdout.strip())
+    # "1.5.3", "v1.5.3", "agy version 1.5.3" 모두 허용. "-preview" 같은 시험판은 제외
+    match = re.search(r"(?<![\d.])v?(\d+)\.(\d+)\.(\d+)(?![-\w.])", version.stdout)
     if not match or tuple(map(int, match.groups())) < (1, 1, 11):
         sys.exit(1)
     result = subprocess.run(["agy", "-p", "/usage", "--output-format", "json"],
@@ -45,12 +46,37 @@ class Bucket:
     reset: datetime | None
 
 
-def parse_quota(payload: object) -> list[Bucket] | None:
-    """Parse CLI quota fields, failing closed on drift.
+def _bucket(name: str, bucket: object) -> Bucket | None:
+    """버킷 하나 해석. 쓸 수 없으면 None (호출 측에서 건너뜀)."""
+    if not isinstance(bucket, dict) or bucket.get("disabled") is True or bucket.get("enabled") is False:
+        return None
+    remaining = bucket.get("remaining_fraction")
+    if (isinstance(remaining, bool) or not isinstance(remaining, (int, float))
+            or not math.isfinite(remaining) or not 0 <= remaining <= 1):
+        return None
+    window = bucket.get("window")
+    if window not in ("5h", "weekly"):  # 대시보드가 그리는 창만
+        return None
+    reset = bucket.get("reset_time")
+    if reset is not None:
+        if not isinstance(reset, str):
+            return None
+        try:
+            reset = datetime.fromisoformat(reset.replace("Z", "+00:00"))
+        except (ValueError, OverflowError):
+            return None
+        if reset.tzinfo is None:
+            return None
+        reset = reset.astimezone(timezone.utc)
+    return Bucket(name, window, float(remaining), reset)
 
-    Require SUCCESS and command.data.groups; agent metadata is ignored.
-    Never reinterpret response text or token-count `usage` as quota.
-    Missing/disabled buckets are unavailable, never fabricated as zero.
+
+def parse_quota(payload: object) -> list[Bucket] | None:
+    """CLI 응답에서 한도만 뽑는다.
+
+    - 응답 전체 형식(status SUCCESS, command.data.groups)이 다르면 None.
+    - 그룹·버킷 하나가 이상하거나 모르는 시간 창이면 그것만 건너뛴다 (나머지 한도는 계속 표시).
+    - 값이 없거나 꺼진 버킷은 0 으로 만들지 않고 건너뛴다. 토큰 사용량 `usage` 는 한도가 아니다.
     """
     if (not isinstance(payload, dict) or payload.get("status") != "SUCCESS"
             or "error" in payload):
@@ -66,39 +92,15 @@ def parse_quota(payload: object) -> list[Bucket] | None:
         return None
     out = []
     for group in groups:
-        if not isinstance(group, dict):
-            return None
-        if group.get("disabled") is True or group.get("enabled") is False:
+        if not isinstance(group, dict) or group.get("disabled") is True or group.get("enabled") is False:
             continue
         name, buckets = group.get("name"), group.get("buckets")
         if not isinstance(name, str) or not name.strip() or not isinstance(buckets, list):
-            return None
+            continue
         for bucket in buckets:
-            if not isinstance(bucket, dict):
-                return None
-            if bucket.get("disabled") is True or bucket.get("enabled") is False:
-                continue
-            remaining = bucket.get("remaining_fraction")
-            if remaining is None:
-                continue
-            if (isinstance(remaining, bool) or not isinstance(remaining, (int, float))
-                    or not 0 <= remaining <= 1 or not math.isfinite(remaining)):
-                return None
-            window = bucket.get("window")
-            if window not in ("5h", "weekly"):
-                return None
-            reset = bucket.get("reset_time")
-            if reset is not None:
-                if not isinstance(reset, str):
-                    return None
-                try:
-                    reset = datetime.fromisoformat(reset.replace("Z", "+00:00"))
-                    if reset.tzinfo is None:
-                        return None
-                    reset = reset.astimezone(timezone.utc)
-                except (ValueError, OverflowError):
-                    return None
-            out.append(Bucket(name, window, float(remaining), reset))
+            b = _bucket(name, bucket)
+            if b:
+                out.append(b)
     return out or None
 
 
