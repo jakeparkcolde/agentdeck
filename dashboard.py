@@ -40,6 +40,7 @@ from worktrees import Worktree, ask_tower, open_in_herdr, remove_worktree, workt
 from pomodoro import PRESETS, Pomodoro, notify_done
 from remote_agy import HOST as AGY_HOST
 from remote_agy import agy_quota
+import remote_agy
 from remote_herdr import (TOWER_SPACE, StudioState, TowerMeta, Workspace, alert_keys, apply_ack, focus,
                           studio_state, tower_meta, tower_split, unzoom_pane, zoom_pane)
 from usage import claude_usage, codex_live, codex_usage
@@ -96,7 +97,7 @@ def collect_llms(pool: ThreadPoolExecutor) -> list[LLM]:
         out.append(codex)
     if not AGY_HOST:  # agy 주소를 설정하지 않았으면 표시 안 함
         return out
-    agy = LLM("AGY", "#7aa2f7")
+    agy = LLM("AGY", "#7aa2f7", login=ag is None and remote_agy.login_needed)
     for b in ag or []:  # 모델 그룹이 여럿이면 창마다 가장 빠듯한(남은 게 적은) 그룹을 보여준다
         if b.window == "5h" and (agy.five is None or b.remaining < agy.five.remaining):
             agy.five = Limit(b.remaining, b.reset, W5)
@@ -246,6 +247,10 @@ class Dashboard:
         elif self.page == WT_PAGE and ev.index in (10, 12):  # 워크트리 → 뒤로(작업 현황) / 다음(머신)
             self.page = 3 if ev.index == 10 else 4
             self.render()
+        elif self.page in (1, 2) and held >= LONG_PRESS and self.login_llm(ev.index):
+            # 로그인이 풀린 LLM 칸 길게: 터미널을 열어 사용자가 직접 로그인
+            ok = remote_agy.open_login()
+            self.toast("AGY", ["터미널에서 로그인", "끝나면 agy 종료"] if ok else ["터미널을 못 열었어요"], "#7aa2f7", 6)
         elif ev.index == 10:
             self.page = PAGES if self.page in (HOME_PAGE, 1) else self.page - 1
             if self.page == AQUA_PAGE:
@@ -336,6 +341,15 @@ class Dashboard:
             self.pool.submit(self.refresh_market)
         if page == WT_PAGE:
             self.pool.submit(self.refresh_worktrees)
+
+    def login_llm(self, idx: int) -> bool:
+        """요약(1페이지)·한도(2페이지)에서 idx 칸이 '로그인 필요' 상태인 LLM 칸인지."""
+        if idx >= 10:
+            return False
+        col = idx % 5
+        if self.page == 1 and col >= 3:
+            return False
+        return col < len(self.llms) and self.llms[col].login
 
     def home_items(self) -> list[tuple[int, str, str, str, str]]:
         """(페이지, 이름, 설명, 아이콘, 색)"""

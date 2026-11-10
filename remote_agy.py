@@ -9,17 +9,22 @@ from __future__ import annotations
 
 import json
 import math
+import shlex
 import subprocess
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
 from config import AGY_HOST
+from i18n import t
 
 HOST = AGY_HOST  # agy 를 쓰는 컴퓨터의 ssh 대상 (config.json agy.host), 없으면 비활성
+AGY_PATH = 'PATH="$HOME/.local/bin:/opt/homebrew/bin:$PATH"'
+LOGIN_EXIT = 3  # REMOTE 가 "로그인 필요"를 알리는 종료 코드
+login_needed = False  # 마지막 조회가 로그인 문제로 실패했는지 (agy 는 SSH 접속용 로그인을 따로 보관한다)
 
 # /usage 를 지원하는 버전(1.1.11+)인지 먼저 확인한다: 옛 CLI 는 슬래시 명령을 프롬프트로 처리해 한도를 쓸 수 있다.
 REMOTE = r'''
-import os, re, subprocess, sys
+import os, re, selectors, subprocess, sys, time
 
 env = dict(os.environ, PATH=os.path.expanduser("~/.local/bin") + ":/opt/homebrew/bin:" + os.environ.get("PATH", ""))
 try:
@@ -29,10 +34,28 @@ try:
     match = re.search(r"(?<![\d.])v?(\d+)\.(\d+)\.(\d+)(?![-\w.])", version.stdout)
     if not match or tuple(map(int, match.groups())) < (1, 1, 11):
         sys.exit(1)
-    result = subprocess.run(["agy", "-p", "/usage", "--output-format", "json"],
-        stdin=subprocess.DEVNULL, capture_output=True, text=True,
-        timeout=60, env=env, check=True)
-    sys.stdout.write(result.stdout)
+    # 로그인이 풀려 있으면 agy 가 로그인 주소를 찍고 기다린다: 그 안내가 보이면 바로 끝내고 3 으로 알린다
+    proc = subprocess.Popen(["agy", "-p", "/usage", "--output-format", "json"],
+        stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env)
+    sel, bufs, deadline = selectors.DefaultSelector(), {proc.stdout: b"", proc.stderr: b""}, time.time() + 60
+    for f in bufs:
+        sel.register(f, selectors.EVENT_READ)
+    while sel.get_map() and time.time() < deadline:
+        for key, _ in sel.select(1):
+            chunk = os.read(key.fileobj.fileno(), 65536)
+            if chunk:
+                bufs[key.fileobj] += chunk
+            else:
+                sel.unregister(key.fileobj)
+        if b"authentication required" in (bufs[proc.stdout] + bufs[proc.stderr]).lower():
+            proc.kill()
+            sys.exit(3)
+    if sel.get_map():  # 시간 초과
+        proc.kill()
+        sys.exit(1)
+    if proc.wait(timeout=5) != 0:
+        sys.exit(1)
+    sys.stdout.buffer.write(bufs[proc.stdout])
 except (OSError, subprocess.SubprocessError, UnicodeError):
     sys.exit(1)
 '''
@@ -105,6 +128,7 @@ def parse_quota(payload: object) -> list[Bucket] | None:
 
 
 def agy_quota() -> list[Bucket] | None:
+    global login_needed
     if not HOST:
         return None
     try:
@@ -114,9 +138,34 @@ def agy_quota() -> list[Bucket] | None:
             input=REMOTE, capture_output=True, text=True, timeout=90,
             check=True,
         )
+        login_needed = False
         return parse_quota(json.loads(result.stdout))
+    except subprocess.CalledProcessError as e:
+        login_needed = e.returncode == LOGIN_EXIT
+        return None
     except (OSError, subprocess.SubprocessError, ValueError, UnicodeError):
         return None
+
+
+def login_command() -> str:
+    """터미널에 넣을 명령: 안내 한 줄을 찍고 원격 agy 를 대화형으로 연다."""
+    hint = t("agy 가 로그인 주소를 보여주면 브라우저로 로그인하고, 끝나면 agy 를 종료하세요. 덱은 곧 다시 읽어요.",
+             "When agy shows a login URL, sign in with your browser, then quit agy. The deck will retry shortly.")
+    return f"echo {shlex.quote(hint)}; ssh -t {shlex.quote(HOST)} {shlex.quote(AGY_PATH + ' agy')}"
+
+
+def open_login() -> bool:
+    """맥의 터미널 앱을 열어 사용자가 직접 로그인하게 한다. 비밀번호나 토큰은 이 프로그램이 다루지 않는다."""
+    if not HOST:
+        return False
+    cmd = login_command().replace("\\", "\\\\").replace('"', '\\"')
+    try:
+        r = subprocess.run(["osascript", "-e", 'tell application "Terminal" to activate',
+                            "-e", f'tell application "Terminal" to do script "{cmd}"'],
+                           capture_output=True, timeout=15)
+        return r.returncode == 0
+    except (OSError, subprocess.SubprocessError):
+        return False
 
 
 if __name__ == "__main__":

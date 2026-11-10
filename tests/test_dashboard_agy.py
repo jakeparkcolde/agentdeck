@@ -67,3 +67,14 @@ class DashboardQuotaTests(unittest.TestCase):
             self.assertEqual(grid[index].title, "-")
             self.assertIsNone(grid[index].ratio)
         self.assertEqual(self.pages.llm_tile(llms[2]).title, "-")
+
+    def test_login_needed_shows_login_tiles(self):
+        with patch.object(self.dashboard.remote_agy, "login_needed", True):
+            llms = self.collect(None)
+        self.assertTrue(llms[2].login)
+        now = datetime(2029, 12, 31, tzinfo=timezone.utc)
+        self.assertEqual(self.pages.llm_tile(llms[2]).title, "로그인")
+        grid = self.pages.page_grid(llms, now)
+        self.assertEqual((grid[2].title, grid[7].sub), ("로그인", "길게: 로그인"))
+        with patch.object(self.dashboard.remote_agy, "login_needed", False):
+            self.assertFalse(self.collect(None)[2].login)

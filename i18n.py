@@ -194,6 +194,8 @@ WORDS: list[tuple[str, str]] = sorted([
     ("% 사용", "% used"), ("눌러봐", "Press me"), ("무제한", "Unlimited"), ("큰 파도", "big wave"),
     ("먹이", "feed"), ("장작", "log"), ("실패", "failed"), ("기타", "Other"), ("한도", "Limits"),
     ("집중", "Focus"), ("홈", "Home"),
+    ("터미널에서 로그인", "Log in in Terminal"), ("끝나면 agy 종료", "then quit agy"),
+    ("터미널을 못 열었어요", "couldn't open Terminal"), ("길게: 로그인", "Hold: log in"), ("로그인", "Log in"),
     ("크레딧", "credits"), ("요금제", "plan"), ("리셋 정보 없음", "no reset info"),
     ("확인 전", "not checked"), ("리셋됨", "reset"), ("리셋", "reset"), ("갱신", "Refresh"), ("이전", "Prev"), ("다음", "Next"),
     ("뒤로", "Back"), ("보기", "View"), ("머신", "Machines"), ("기기", "Mac"), ("휴지통", "Trash"), ("비우기?", "Empty?"),

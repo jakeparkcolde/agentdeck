@@ -40,6 +40,7 @@ class LLM:
     five: Limit | None = None
     week: Limit | None = None
     extra: str = ""  # 예: 크레딧
+    login: bool = False  # 로그인이 풀려 한도를 못 읽는 상태 (칸을 길게 누르면 로그인 창)
 
     def binding(self) -> Limit | None:
         """더 빡빡한(남은 게 적은) 창."""
@@ -87,7 +88,13 @@ def nav(page: int, total: int, brightness: int, middle: tuple[str, str] | None =
 
 
 # ---------- 페이지 1: 요약 ----------
+def login_tile(header: str) -> Button:
+    return Button(header=header, title="로그인", sub="길게: 로그인", bg=BG, accent=YELLOW, border=YELLOW)
+
+
 def llm_tile(m: LLM) -> Button:
+    if m.login:
+        return login_tile(m.name)
     b = m.binding()
     return Button(
         header=m.name,
@@ -183,7 +190,9 @@ def page_grid(llms: list[LLM], now: datetime, credits: list[tuple[str, str, dict
                 p[idx] = Button(bg=BG)
                 continue
             lim: Limit | None = getattr(m, attr)
-            if lim is None or lim.remaining is None:
+            if m.login:
+                p[idx] = login_tile(f"{m.name.split()[0]} {label}")
+            elif lim is None or lim.remaining is None:
                 p[idx] = Button(header=f"{m.name.split()[0]} {label}", title="-", sub="없음", bg=BG, accent=m.color)
             else:
                 p[idx] = Button(header=f"{m.name.split()[0]} {label}", title=pct(lim.remaining),
