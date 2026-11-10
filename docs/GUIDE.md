@@ -355,7 +355,7 @@ Google Flow와 Higgsfield는 남은 크레딧을 **웹 화면에서만** 보여�
 
 ```jsonc
 {
-  "ui_lang": "ko",              // 화면 언어: "ko" 또는 "en"
+  "ui_lang": "auto",            // 화면·안내 언어: "auto"(맥 언어 따라감), "ko", "en"
   "screensaver_min": 10,        // 이 시간(분) 동안 입력이 없으면 화면보호기 (0 = 끔)
   "screensaver_scene": "aqua",  // 화면보호기 장면: aqua · fire · rain · beach, alternate = 켜질 때마다 차례로
   "sound": {"enabled": false, "volume": 0.6},  // 효과음·배경음 (덱이 연결된 맥 스피커)

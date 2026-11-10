@@ -115,7 +115,7 @@ def refresh_dryrun(host: str, force: bool = False) -> None:
             if m:
                 res["clean_gb"] = _size_gb(m.group(1))
             if "purge_gb" not in res and "clean_gb" not in res:
-                print(f"mole dry-run: {host} 결과를 읽지 못함 ({out.strip().splitlines()[-1:] or '출력 없음'})", flush=True)
+                print(f"mole dry-run: {host} unreadable output ({out.strip().splitlines()[-1:] or 'no output'})", flush=True)
             res["at"] = time.time()
             with _lock:
                 data = _load()
@@ -123,7 +123,7 @@ def refresh_dryrun(host: str, force: bool = False) -> None:
                 os.makedirs(os.path.dirname(CACHE_PATH), exist_ok=True)
                 json.dump(data, open(CACHE_PATH, "w"))
         except Exception as e:  # 시간 초과 등: 로그만 남기고 다음 주기에 다시
-            print(f"mole dry-run: {host} 실패 {type(e).__name__}: {e}", flush=True)
+            print(f"mole dry-run: {host} failed {type(e).__name__}: {e}", flush=True)
         finally:
             with _lock:
                 _running.discard(host)

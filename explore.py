@@ -49,7 +49,7 @@ def reader(info: dict, stop: threading.Event) -> None:
         desc = dev.get_report_descriptor()
         log(f"{tag} report descriptor ({len(desc)}B): {bytes(desc).hex(' ')}")
     except Exception as e:  # 구버전 hidapi는 미지원
-        log(f"{tag} report descriptor 읽기 실패: {e}")
+        log(f"{tag} report descriptor read failed: {e}")
 
     dev.set_nonblocking(False)
     last = None
@@ -62,24 +62,24 @@ def reader(info: dict, stop: threading.Event) -> None:
         text = trim(data)
         # 같은 패킷이 반복되면(주기적 heartbeat 등) 요약만 남긴다
         if text == last:
-            log(f"{tag} #{count} (직전과 동일)")
+            log(f"{tag} #{count} (same as previous)")
         else:
             log(f"{tag} #{count} {text}")
         last = text
     dev.close()
-    log(f"{tag} closed, 총 {count}개 리포트")
+    log(f"{tag} closed, {count} reports total")
 
 
 def main() -> None:
     infos = hid.enumerate(VID, PID)
     if not infos:
-        log("장치를 찾지 못함. USB 연결과 Ulanzi Studio 종료 여부를 확인하세요.")
+        log("Device not found. Check the USB cable and that Ulanzi Studio is closed.")
         return
     stop = threading.Event()
     threads = [threading.Thread(target=reader, args=(i, stop), daemon=True) for i in infos]
     for t in threads:
         t.start()
-    log(f"=== {DURATION:.0f}초 동안 감시합니다. 버튼을 하나씩 천천히 눌러보세요 (다이얼/길게 누르기 포함) ===")
+    log(f"=== watching for {DURATION:.0f}s. Press buttons one at a time, slowly (dials and long presses too) ===")
     try:
         time.sleep(DURATION)
     except KeyboardInterrupt:
@@ -87,7 +87,7 @@ def main() -> None:
     stop.set()
     for t in threads:
         t.join(timeout=1)
-    log("=== 종료 ===")
+    log("=== done ===")
 
 
 if __name__ == "__main__":

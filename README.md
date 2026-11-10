@@ -150,7 +150,7 @@ cp config.example.json config.json
 |---|---|
 | 로그인할 때 자동 실행 | `./scripts/install-launchd.sh` |
 | 에이전트 현황 켜기 (IDE·터미널 상관없음) | `python3 scripts/install-hooks.py` |
-| 화면 언어 바꾸기 | `config.json`의 `"ui_lang": "ko"` 또는 `"en"` |
+| 화면 언어 바꾸기 | 기본은 맥 시스템 언어(한국어면 한국어, 그 밖엔 영어). 고정하려면 `config.json`의 `"ui_lang": "ko"` 또는 `"en"` |
 
 처음이라면 **[사용 가이드](docs/GUIDE.md)**를 따라 하세요. 준비부터 기능별 설정, 문제 해결까지 순서대로 정리돼 있어요.
 

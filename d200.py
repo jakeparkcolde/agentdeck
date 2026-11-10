@@ -21,6 +21,8 @@ from typing import Callable
 import hid
 from PIL import Image, ImageDraw, ImageFont
 
+from i18n import t
+
 VID, PID = 0x2207, 0x0019
 PACKET = 1024
 HEADER = 8
@@ -202,7 +204,8 @@ class D200:
     def __init__(self) -> None:
         info = next((d for d in hid.enumerate(VID, PID) if d["interface_number"] == 0), None)
         if not info:
-            raise RuntimeError("D200 not found (USB 연결 / Ulanzi Studio 종료 확인)")
+            raise RuntimeError(t("D200 을 찾지 못했어요 (USB 연결과 Ulanzi Studio 종료를 확인하세요)",
+                                 "D200 not found (check the USB cable and quit Ulanzi Studio)"))
         self.dev = hid.device()
         self.dev.open_path(info["path"])
         self._lock = threading.Lock()
@@ -303,9 +306,9 @@ if __name__ == "__main__":
     deck.set_brightness(80)
     deck.set_buttons(buttons)
     deck.set_small_window(mode=1)
-    print(f"=== {duration:.0f}초 동안 버튼 이벤트를 받습니다 ===", flush=True)
+    print(f"=== listening for button events for {duration:.0f}s ===", flush=True)
     try:
         time.sleep(duration)
     finally:
         deck.close()
-        print("=== 종료 ===", flush=True)
+        print("=== done ===", flush=True)

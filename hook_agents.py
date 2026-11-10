@@ -140,4 +140,4 @@ def focus(ws: Workspace, step: int = 0) -> bool:
 if __name__ == "__main__":
     s = state([None])
     for w in s.workspaces:
-        print(w.name, "작업", w.working, "결정", w.attention, "완료", w.done, w.agents)
+        print(w.name, "working", w.working, "attention", w.attention, "done", w.done, w.agents)

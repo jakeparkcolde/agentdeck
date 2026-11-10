@@ -25,6 +25,7 @@ from aquarium import Aquarium
 from games import Games
 
 from config import CFG
+from i18n import t
 import parcels
 import parcels_import
 import web_credits
@@ -489,7 +490,7 @@ class Dashboard:
                 got.append(f"{name}={st.health}")
                 refresh_dryrun(host)  # 정리 가능 용량: 6시간마다 백그라운드 측정 (상세 페이지를 안 열어도)
         self.mole_at = time.time()
-        print(f"{datetime.now():%H:%M:%S} mole: {' '.join(got) or '응답 없음'}", flush=True)
+        print(f"{datetime.now():%H:%M:%S} mole: {' '.join(got) or 'no response'}", flush=True)
         if self.page in (4, DEV_PAGE):
             self.render()
 
@@ -915,7 +916,7 @@ class Dashboard:
         self.deck.start()
         self.deck.set_brightness(self.brightness)
         self.deck.set_small_window(mode=SMALL_BACKGROUND)  # 넓은 칸 = 커스텀 시계 이미지
-        print("D200 대시보드 시작 (Ctrl+C 종료)", flush=True)
+        print(t("D200 대시보드 시작 (Ctrl+C 로 종료)", "D200 dashboard started (Ctrl+C to quit)"), flush=True)
         updater.start_background()
         self.play_intro()
         while not self.stop.is_set() and not self.deck.disconnected.is_set():
@@ -964,7 +965,7 @@ class Dashboard:
             self.fetch_now.clear()
         self.deck.close()
         if self.deck.disconnected.is_set():
-            print(f"{datetime.now():%H:%M:%S} 장치 연결 끊김, 종료", flush=True)
+            print(f"{datetime.now():%H:%M:%S} device disconnected, exiting", flush=True)
             raise SystemExit(1)  # launchd KeepAlive 가 재시작
 
 

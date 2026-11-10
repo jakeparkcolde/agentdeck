@@ -1,5 +1,5 @@
 {
-  "ui_lang": "en",
+  "ui_lang": "auto",
   "agent_source": "hooks",
   "hooks": {
     "hosts": [

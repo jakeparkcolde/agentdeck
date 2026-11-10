@@ -26,6 +26,7 @@ import subprocess
 from dataclasses import dataclass
 
 from config import LEAD_PANE, STUDIO_ENABLED, STUDIO_HOST, WORKTREE_GLOBS
+from i18n import t
 
 HOST = STUDIO_HOST
 HERDR_APP = os.path.expanduser("~/.local/bin/herdr-app")
@@ -107,7 +108,9 @@ class Worktree:
     def age_text(self) -> str:
         if self.age_h is None:
             return "-"
-        return f"{self.age_h / 24:.0f}일" if self.age_h >= 48 else f"{self.age_h:.0f}시간"
+        if self.age_h >= 48:
+            return t(f"{self.age_h / 24:.0f}일", f"{self.age_h / 24:.0f}d")
+        return t(f"{self.age_h:.0f}시간", f"{self.age_h:.0f}h")
 
 
 ORDER = {"방치": 0, "정리 가능": 1, "오래됨": 2, "작업": 3, "정상": 4}
@@ -148,21 +151,26 @@ def open_in_herdr(w: Worktree, space_id: str | None) -> bool:
 
 def remove_worktree(w: Worktree) -> tuple[bool, str]:
     if not w.can_remove:
-        return False, "정리 가능 상태가 아님"
+        return False, t("정리 가능 상태가 아님", "not ready to remove")
     # main 저장소에서 제거 (강제 아님: 변경이 있으면 git 이 거부)
     r = _ssh(f"git -C {shlex.quote(w.path)} worktree remove {shlex.quote(w.path)}")
     return r.returncode == 0, (r.stderr or r.stdout).strip()[:200]
 
 
 def ask_tower(w: Worktree) -> tuple[bool, str]:
-    msg = (f"[D200 워크트리 정리 요청] {w.path} (브랜치 {w.branch}, 커밋 안 한 변경 {w.dirty}개, "
-           f"기준 {w.base or '없음'} 대비 앞선 커밋 {w.ahead if w.ahead is not None else '?'}개, "
-           f"마지막 커밋 {w.age_text()} 전). 상태를 확인하고 필요한 커밋·머지·정리를 진행해줘. "
-           f"삭제나 되돌릴 수 없는 작업은 실행 전에 나에게 먼저 확인받아줘.")
+    ahead = w.ahead if w.ahead is not None else "?"
+    msg = t(f"[D200 워크트리 정리 요청] {w.path} (브랜치 {w.branch}, 커밋 안 한 변경 {w.dirty}개, "
+            f"기준 {w.base or '없음'} 대비 앞선 커밋 {ahead}개, "
+            f"마지막 커밋 {w.age_text()} 전). 상태를 확인하고 필요한 커밋·머지·정리를 진행해줘. "
+            f"삭제나 되돌릴 수 없는 작업은 실행 전에 나에게 먼저 확인받아줘.",
+            f"[D200 worktree cleanup request] {w.path} (branch {w.branch}, {w.dirty} uncommitted changes, "
+            f"{ahead} commits ahead of {w.base or 'none'}, "
+            f"last commit {w.age_text()} ago). Check its state and do the needed commit/merge/cleanup. "
+            f"Ask me before anything that deletes data or can't be undone.")
     r = _ssh(f"herdr-core send {LEAD_PANE} {shlex.quote(msg)}")
     return r.returncode == 0, (r.stderr or r.stdout).strip()[:200]
 
 
 if __name__ == "__main__":
     for w in worktrees() or []:
-        print(f"{w.state:6} {w.repo}/{w.name} [{w.branch}] 변경 {w.dirty} 앞섬 {w.ahead} ({w.base}) {w.age_text()} 에이전트 {len(w.agents)}")
+        print(f"{w.state:6} {w.repo}/{w.name} [{w.branch}] dirty {w.dirty} ahead {w.ahead} ({w.base}) {w.age_text()} agents {len(w.agents)}")

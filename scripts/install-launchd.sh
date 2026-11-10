@@ -6,7 +6,11 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 LABEL="com.agentdeck.dashboard"
 PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
 PY="$ROOT/.venv/bin/python"
-[ -x "$PY" ] || { echo "먼저 가상환경을 만드세요: python3 -m venv .venv && .venv/bin/pip install -r requirements.txt"; exit 1; }
+# 안내 문구 언어: 맥의 첫 번째 선호 언어가 한국어면 한국어, 아니면 영어
+if defaults read -g AppleLanguages 2>/dev/null | sed -n 2p | grep -qi '"\?ko'; then KO=1; else KO=0; fi
+say() { if [ "$KO" = 1 ]; then echo "$1"; else echo "$2"; fi; }
+[ -x "$PY" ] || { say "먼저 가상환경을 만드세요: python3 -m venv .venv && .venv/bin/pip install -r requirements.txt" \
+          "Create the virtualenv first: python3 -m venv .venv && .venv/bin/pip install -r requirements.txt"; exit 1; }
 mkdir -p "$HOME/Library/LaunchAgents"
 cat > "$PLIST" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
@@ -33,4 +37,4 @@ cat > "$PLIST" <<PLIST
 PLIST
 launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null || true
 launchctl bootstrap "gui/$(id -u)" "$PLIST"
-echo "등록됨: $LABEL (로그: $ROOT/dashboard.log)"
+say "등록됨: $LABEL (로그: $ROOT/dashboard.log)" "Registered: $LABEL (log: $ROOT/dashboard.log)"

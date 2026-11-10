@@ -150,7 +150,7 @@ cp config.example.json config.json
 |---|---|
 | Start at login | `./scripts/install-launchd.sh` |
 | Turn on agent activity (any IDE or terminal) | `python3 scripts/install-hooks.py` |
-| Change on-device language | `"ui_lang": "en"` or `"ko"` in `config.json` |
+| Change language | Follows your macOS language by default (Korean → Korean, anything else → English). To pin it, set `"ui_lang": "en"` or `"ko"` in `config.json` |
 
 New to this? Follow the **[guide](docs/GUIDE.en.md)**, from setup through each feature to troubleshooting.
 

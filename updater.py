@@ -43,7 +43,7 @@ def check(force: bool = False) -> dict:
         remote, _, branch = up.partition("/")
         f = _git("fetch", "--quiet", remote, branch, timeout=60)
         if f.returncode != 0:
-            raise RuntimeError(f.stderr.strip()[:80] or "fetch 실패")
+            raise RuntimeError(f.stderr.strip()[:80] or "fetch failed")
         n = int(_git("rev-list", "--count", f"HEAD..{up}").stdout.strip() or 0)
         subj = _git("log", "-1", "--format=%s", up).stdout.strip() if n else ""
         with _lock:

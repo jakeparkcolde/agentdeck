@@ -162,7 +162,7 @@ def fetch(parcels: list[Parcel]) -> None:
             req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (agentdeck)"})
             data = json.loads(urllib.request.urlopen(req, timeout=20, context=_CTX).read())
         except Exception as e:
-            print(f"parcels: 조회 실패 {e}", flush=True)
+            print(f"parcels: lookup failed {e}", flush=True)
             continue
         by_no = {m.get("mailNo"): m for m in data.get("module", [])}
         for p in chunk:

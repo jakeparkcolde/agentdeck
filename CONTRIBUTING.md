@@ -17,14 +17,14 @@ agentdeck keeps growing, and contributions of every size are welcome: **new page
 | `pages.py` | 페이지 함수: 데이터를 받아 `{칸 번호: Button}`을 돌려줘요. 칸 0~9는 내용, 10~12는 하단 버튼 |
 | `dashboard.py` | 갱신 루프, 버튼 입력 처리, 페이지 전환 |
 | `clock.py` | 오른쪽 아래 넓은 칸(458×196) 이미지 |
-| `i18n.py` | 화면 문구 번역 (`ui_lang`) |
+| `i18n.py` | 화면·터미널 문구 번역 (`ui_lang`, 기본은 맥 시스템 언어) |
 | `config.py` | `config.json` 읽기. 선택 기능은 여기서 켜고 꺼요 |
 
 ### 새 페이지 추가하기
 1. `pages.py`에 `def page_xxx(data) -> dict[int, Button]` 함수를 만드세요. 칸 0~9만 채우면 돼요.
 2. `dashboard.py`의 `render()`에 페이지 번호 분기를 추가하고 `PAGES`를 늘리세요.
 3. 데이터를 가져오는 부분은 별도 모듈로 분리하고, 실패하면 예외 대신 `None`을 돌려주세요. 대시보드가 멈추면 안 돼요.
-4. 화면 문구는 한국어로 쓰고 `i18n.py`의 `WORDS`에 영어를 추가하세요.
+4. 화면 문구는 한국어로 쓰고 `i18n.py`의 `WORDS`(숫자가 들어가면 `PATTERNS`)에 영어를 추가하세요. 터미널에 찍는 안내·오류는 `t("한국어", "English")`로 쓰세요. 빠뜨리면 `tests/test_i18n.py`가 알려줘요.
 5. `demo.py`에 가짜 데이터 예시를 추가하면 README 이미지도 함께 만들어져요.
 
 ### 지켜주세요
@@ -47,14 +47,14 @@ agentdeck keeps growing, and contributions of every size are welcome: **new page
 | `pages.py` | Page functions: data in, `{tile index: Button}` out. Tiles 0-9 are content, 10-12 the bottom buttons |
 | `dashboard.py` | Refresh loop, input handling, page switching |
 | `clock.py` | The wide bottom-right tile (458×196) |
-| `i18n.py` | On-device translations (`ui_lang`) |
+| `i18n.py` | On-device and terminal translations (`ui_lang`, defaults to the macOS language) |
 | `config.py` | Reads `config.json`; optional features are toggled here |
 
 ### Adding a page
 1. Add `def page_xxx(data) -> dict[int, Button]` to `pages.py`. Fill tiles 0-9.
 2. Add a branch for the page number in `render()` in `dashboard.py` and bump `PAGES`.
 3. Put data fetching in its own module and return `None` on failure instead of raising; the dashboard must never stop.
-4. Write labels in Korean and add the English to `WORDS` in `i18n.py`.
+4. Write labels in Korean and add the English to `WORDS` in `i18n.py` (`PATTERNS` if it contains numbers). Terminal hints and errors use `t("한국어", "English")`. `tests/test_i18n.py` fails if you miss one.
 5. Add mock data to `demo.py` so the README images get generated too.
 
 ### Please

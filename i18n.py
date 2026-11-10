@@ -1,19 +1,47 @@
-"""기기 화면 문구 언어 (config.json 의 "ui_lang": "ko" | "en").
+"""화면·터미널 문구 언어 (config.json 의 "ui_lang": "auto" | "ko" | "en").
 
-페이지 코드는 한국어로 문구를 만들고, 그리는 단계(render_icon·시계 패널)에서 tr() 로 바꾼다.
-숫자가 들어간 문구는 정규식, 나머지는 긴 문구부터 치환한다.
+- "auto"(또는 생략): macOS 시스템 언어를 따른다. 한국어면 ko, 그 밖의 언어는 en.
+- 기기 화면: 페이지 코드는 한국어로 문구를 만들고, 그리는 단계(render_icon·시계 패널)에서 tr() 로 바꾼다.
+  숫자가 들어간 문구는 정규식, 나머지는 긴 문구부터 치환한다.
+- 터미널 안내·오류: t("한국어", "English") 로 두 언어를 나란히 적는다.
 """
 
 from __future__ import annotations
 
+import os
 import re
+import subprocess
+
+
+def system_lang() -> str:
+    """macOS 의 첫 번째 선호 언어가 한국어면 'ko', 아니면 'en'."""
+    try:
+        out = subprocess.run(["defaults", "read", "-g", "AppleLanguages"], capture_output=True,
+                             text=True, timeout=3).stdout
+        first = re.search(r'"?([A-Za-z]{2,3})[-_"\s]', out)
+        if first:
+            return "ko" if first[1].lower() == "ko" else "en"
+    except Exception:
+        pass
+    env = os.environ.get("LC_ALL") or os.environ.get("LANG") or ""
+    return "ko" if env.lower().startswith("ko") else "en"
+
+
+def resolve(value: str | None) -> str:
+    return value if value in ("ko", "en") else system_lang()
+
 
 try:
     from config import CFG
 
-    LANG: str = CFG.get("ui_lang", "ko")
+    LANG: str = resolve(CFG.get("ui_lang"))
 except Exception:
-    LANG = "ko"
+    LANG = resolve(None)
+
+
+def t(ko: str, en: str) -> str:
+    """터미널 메시지처럼 문장 단위로 번역해 두는 곳에 쓴다."""
+    return ko if LANG == "ko" else en
 
 # 숫자가 들어가는 패턴 (먼저 적용)
 PATTERNS: list[tuple[str, str]] = [
@@ -22,6 +50,15 @@ PATTERNS: list[tuple[str, str]] = [
     (r"캐시 정리 가능 ([\d.]+[GT]B)", r"\1 reclaimable"),
     (r"정리 가능 ([\d.]+[GT]B)", r"\1 reclaimable"),
     (r"(\d+)초마다", r"every \1s"),
+    (r"(\d+)초 안에 길게 한 번 더", r"Hold again within \1s"),
+    (r"(\d+)개 변경 반영", r"\1 changes applied"),
+    (r"(\d+)번 · (\d+)번 코 차이 접전!", r"#\1 · #\2 neck and neck!"),
+    (r"(\d+)일 내", r"in \1d"),
+    (r"([\d.]+[KMGT]?B) 비움", r"freed \1"),
+    (r"(\S+) 확보$", r"\1 freed"),
+    (r" 외 (\d+)$", r" +\1"),
+    (r"(\d+)회$", r"\1x"),
+    (r"(\d+)종$", r"\1 games"),
     (r"가동 (\d+)일", r"up \1d"),
     (r"(\d+)개 항목", r"\1 items"),
     (r"(\d+)개", r"\1 items"),
@@ -84,7 +121,7 @@ WORDS: list[tuple[str, str]] = sorted([
     ("로열 플러시", "Royal flush"), ("스트레이트 플러시", "Straight flush"),
     ("포카드", "Four of a kind"), ("풀하우스", "Full house"), ("플러시", "Flush"), ("스트레이트", "Straight"),
     ("트리플", "Three of a kind"), ("투페어", "Two pair"), ("J 이상 원페어", "Jacks or better"), ("교체", "DRAW"),
-    ("킵 고르고 여기 누르기", "Pick holds, then press here"), ("지금 패", "Now"), ("없음", "nothing"),
+    ("킵 고르고 여기 누르기", "Pick holds, then press here"), ("지금 패", "Now"),
     ("딜 또는 여기: 다음 판", "Deal or here: next hand"), ("아쉬워요", "No win"), ("베팅 고르고 딜", "Pick a bet, then deal"),
     ("누르면 남김", "tap to hold"), ("남김", "held"), ("킵?", "Hold?"), ("킵", "HOLD"), ("배", "x"), ("코인 걸기", "bet"), ("블랙잭!", "Blackjack!"),
     ("블랙잭", "Blackjack"), ("한 장 더", "one more"), ("그만", "stay"), ("딜러 차례", "dealer's turn"),
@@ -118,7 +155,7 @@ WORDS: list[tuple[str, str]] = sorted([
     ("노을 · 파도", "sunset · waves"), ("물멍", "Aquarium"), ("불멍", "Fire"), ("비멍", "Rain"), ("바다", "Beach"),
     ("작업 현황", "Agents"), ("뽀모도로", "Pomodoro"), ("어항", "Aquarium"), ("요약", "Summary"), ("머신", "Machines"),
     ("주식", "Stocks"), ("게임", "Games"), ("택배", "Parcels"),
-    ("짧게 눌러 먹이", "tap to feed"), ("짧게 눌러 장작", "tap to add a log"), ("짧게 눌러 번개", "tap for lightning"),
+    ("짧게 눌러 먹이", "tap to feed"), ("짧게 눌러 ", "tap: "), ("짧게 눌러 장작", "tap to add a log"), ("짧게 눌러 번개", "tap for lightning"),
     ("짧게 눌러 큰 파도", "tap for a big wave"), ("길게 눌러 나가기", "hold to exit"),
     ("새 버전", "Update"), ("넓은 칸을 2초 누르고 있으면", "hold the wide tile 2s"), ("업데이트 후 다시 켜져요", "to update and restart"),
     ("최신 버전", "Up to date"), ("업데이트 확인 중…", "checking…"), ("새 버전이 없어요", "no new version"),
@@ -138,6 +175,25 @@ WORDS: list[tuple[str, str]] = sorted([
     ("다음 기기", "Next Mac"), ("시간 선택", "Pick a time"), ("집중 중", "Focus"), ("일시정지", "Paused"),
     ("뽀모도로", "Pomodoro"), ("완료!", "Done!"), ("비어 있음", "empty"), ("분리됨", "Detached"),
     ("워크트리", "Worktrees"), ("스튜디오", "Studio"), ("페이스", "pace"), ("주간", "Week"),
+    ("캐시 정리 중 (몇 분 걸릴 수 있어요)", "Cleaning caches (may take a few min)"),
+    ("산출물 정리 중 (몇 분 걸릴 수 있어요)", "Cleaning artifacts (may take a few min)"),
+    ("휴지통 비우는 중", "Emptying trash"), ("휴지통 영구 비우기", "Empty trash for good"),
+    ("워크트리 삭제 (브랜치는 유지)", "Remove worktree (branch kept)"),
+    ("리드 에이전트에게 정리 요청 전송", "Ask the lead agent to clean up"),
+    ("총괄에게 전송함", "Sent to lead"), ("삭제 완료", "Removed"), ("삭제 실패", "Remove failed"),
+    ("길게 2번 눌러 실행", "Hold twice to run"), ("영구 삭제됩니다", "Deleted for good"),
+    ("node_modules·.venv·dist 등", "node_modules·.venv·dist etc."),
+    ("아래 오른쪽 두 칸: 길게 2번 = 실행", "Bottom-right two: hold twice = run"), ("짧게 = 설명", "tap = info"),
+    ("Mole 이 설치되지 않은 기기", "Mole not installed"), ("짧게: Herdr 에서 열기", "Tap: open in Herdr"),
+    ("길게 2번: 정리 가능 → 삭제", "Hold twice: mergeable → remove"),
+    ("길게 2번: 그 외 → 총괄에 정리 요청", "Hold twice: others → ask lead"),
+    ("길게 2번: 비우기", "Hold twice: empty"), ("길게 2번: 정리", "Hold twice: purge"),
+    ("지울 산출물이 없어요", "nothing to remove"), ("비움 완료", "Emptied"),
+    ("정리 가능 상태가 아님", "not ready to remove"), ("업데이트 실패", "Update failed"), ("fetch 실패", "fetch failed"),
+    ("확인 필요", "Confirm"), ("실행 중…", "Running…"), ("측정 중…", "measuring…"), ("측정 전", "not measured"),
+    ("% 사용", "% used"), ("눌러봐", "Press me"), ("무제한", "Unlimited"), ("큰 파도", "big wave"),
+    ("먹이", "feed"), ("장작", "log"), ("실패", "failed"), ("기타", "Other"), ("한도", "Limits"),
+    ("집중", "Focus"), ("홈", "Home"),
     ("크레딧", "credits"), ("요금제", "plan"), ("리셋 정보 없음", "no reset info"),
     ("확인 전", "not checked"), ("리셋됨", "reset"), ("리셋", "reset"), ("갱신", "Refresh"), ("이전", "Prev"), ("다음", "Next"),
     ("뒤로", "Back"), ("보기", "View"), ("머신", "Machines"), ("기기", "Mac"), ("휴지통", "Trash"), ("비우기?", "Empty?"),

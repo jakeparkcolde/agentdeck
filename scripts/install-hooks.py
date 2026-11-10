@@ -16,6 +16,9 @@ import re
 import shutil
 import sys
 
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from i18n import t  # noqa: E402
+
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 HOOK = os.path.join(ROOT, "hooks", "agent_hook.py")
 CLAUDE_CMD = f'python3 "{HOOK}" claude'
@@ -54,12 +57,12 @@ def claude(install: bool) -> None:
     os.makedirs(os.path.dirname(CLAUDE_SETTINGS), exist_ok=True)
     with open(CLAUDE_SETTINGS, "w") as fp:
         json.dump(data, fp, indent=2, ensure_ascii=False)
-    print(("설치" if install else "제거"), "Claude Code 훅:", CLAUDE_SETTINGS)
+    print(t("설치" if install else "제거", "Installed" if install else "Removed"), t("Claude Code 훅:", "Claude Code hooks:"), CLAUDE_SETTINGS)
 
 
 def codex(install: bool) -> None:
     if not os.path.exists(CODEX_CONFIG):
-        print("Codex 설정 없음:", CODEX_CONFIG)
+        print(t("Codex 설정 없음:", "No Codex config:"), CODEX_CONFIG)
         return
     text = open(CODEX_CONFIG).read()
     m = re.search(r"^notify\s*=\s*(\[.*?\])\s*$", text, re.M | re.S)
@@ -77,7 +80,8 @@ def codex(install: bool) -> None:
         text = line + "\n" + text
     backup(CODEX_CONFIG)
     open(CODEX_CONFIG, "w").write(text)
-    print(("설치" if install else "제거"), "Codex notify:", CODEX_CONFIG, "(기존:", original or "없음", ")")
+    print(t("설치" if install else "제거", "Installed" if install else "Removed"), "Codex notify:", CODEX_CONFIG,
+          t("(기존:", "(previous:"), original or t("없음", "none"), ")")
 
 
 if __name__ == "__main__":

@@ -355,7 +355,7 @@ Everything lives in `config.json`. **Anything you leave out is turned off.** Res
 
 ```jsonc
 {
-  "ui_lang": "en",              // on-device language: "en" or "ko"
+  "ui_lang": "auto",            // device & terminal language: "auto" (follows macOS), "en", "ko"
   "screensaver_min": 10,        // idle minutes before the screensaver (0 = off)
   "screensaver_scene": "aqua",  // screensaver scene: aqua · fire · rain · beach, or alternate
   "sound": {"enabled": false, "volume": 0.6},  // sound effects and ambience on the Mac speaker

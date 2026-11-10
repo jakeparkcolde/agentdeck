@@ -26,7 +26,10 @@ class DashboardQuotaTests(unittest.TestCase):
         cls.codex_type = CodexUsage
 
     def collect(self, buckets):
-        with patch.object(self.dashboard, "agy_quota", return_value=buckets), \
+        # 설정과 상관없이 Claude·Codex·AGY 세 열이 다 나오게 (AGY 호스트 지정, ~/.codex 있음)
+        with patch.object(self.dashboard, "AGY_HOST", "test-host"), \
+             patch.object(self.dashboard.Path, "exists", return_value=True), \
+             patch.object(self.dashboard, "agy_quota", return_value=buckets), \
              patch.object(self.dashboard, "claude_usage", return_value=self.claude_type()), \
              patch.object(self.dashboard, "codex_live", return_value=self.codex_type()), \
              ThreadPoolExecutor(max_workers=2) as pool:

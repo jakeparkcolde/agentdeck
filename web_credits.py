@@ -27,6 +27,7 @@ from datetime import datetime
 from pathlib import Path
 
 import parcels_import as browser
+from i18n import t
 
 CACHE_DIR = Path.home() / ".cache" / "d200"
 POLL_SEC = 30 * 60
@@ -174,11 +175,11 @@ def run(name: str) -> dict:
             if proc:
                 proc.terminate()
     if not raw.get("text"):
-        raise SystemExit(f"{name} 에 로그인이 필요해요: .venv/bin/python web_credits.py login {name}")
+        raise SystemExit(t(f"{name} 에 로그인이 필요해요", f"Please log in to {name}") + f": .venv/bin/python web_credits.py login {name}")
     now = datetime.now()
     got = PARSERS[name](raw, now)
     if got["credits"] is None:
-        raise SystemExit(f"{name} 크레딧을 못 읽었어요")
+        raise SystemExit(t(f"{name} 크레딧을 못 읽었어요", f"Could not read {name} credits"))
     got["checked"] = now.astimezone().isoformat(timespec="seconds")
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
     cache_path(name).write_text(json.dumps(got, ensure_ascii=False))
@@ -200,7 +201,8 @@ def login(name: str) -> None:
         subprocess.run(["osascript", "-e", 'tell application "Google Chrome" to activate'], capture_output=True)
     else:
         browser.launch(headless=False, url=url)
-    print("덱 전용 Chrome 창에서 직접 로그인한 뒤 그 창을 닫아 주세요.")
+    print(t("덱 전용 Chrome 창에서 직접 로그인한 뒤 그 창을 닫아 주세요.",
+            "Log in yourself in the dedicated Chrome window, then close that window."))
 
 
 if __name__ == "__main__":
@@ -209,5 +211,5 @@ if __name__ == "__main__":
         login(args[1] if len(args) > 1 else "flow")
     else:
         for n in args or list(SERVICES):
-            t = time.time()
-            print(n, run(n), f"({time.time() - t:.0f}s)")
+            t0 = time.time()
+            print(n, run(n), f"({time.time() - t0:.0f}s)")

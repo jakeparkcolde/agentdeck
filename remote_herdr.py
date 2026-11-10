@@ -355,4 +355,4 @@ if __name__ == "__main__":
     s = studio_state()
     print("source:", s.source, "online:", s.online, "working:", s.working, "attention:", s.attention)
     for w in s.workspaces:
-        print(f"  {w.name}: 작업 {w.working} 결정 {w.attention} 완료알림 {w.done} 대기 {w.idle} {w.agents} -> {w.focus_target or w.space_id}")
+        print(f"  {w.name}: working {w.working} attention {w.attention} done {w.done} idle {w.idle} {w.agents} -> {w.focus_target or w.space_id}")

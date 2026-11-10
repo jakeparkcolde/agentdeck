@@ -22,6 +22,8 @@ import threading
 import time
 import urllib.request
 from datetime import date
+
+from i18n import t
 from pathlib import Path
 
 import parcels
@@ -77,7 +79,7 @@ def _chrome() -> str:
             return c
     found = shutil.which("google-chrome") or shutil.which("chromium")
     if not found:
-        raise SystemExit("Chrome(또는 Chromium·Edge)이 필요해요")
+        raise SystemExit(t("Chrome(또는 Chromium·Edge)이 필요해요", "Chrome (or Chromium/Edge) is required"))
     return found
 
 
@@ -104,7 +106,7 @@ def launch(headless: bool, url: str = ORDERS_URL) -> subprocess.Popen | None:
         if _alive():
             return proc
         time.sleep(0.25)
-    raise SystemExit("Chrome 을 띄우지 못했어요")
+    raise SystemExit(t("Chrome 을 띄우지 못했어요", "Could not start Chrome"))
 
 
 class _CDP:
@@ -141,7 +143,7 @@ async def _collect() -> list[dict]:
         href = await ev("location.href") or ""
         if "login" in href:
             await c.call("Target.closeTarget", {"targetId": tid})
-            raise SystemExit("알리에 로그인이 필요해요: .venv/bin/python parcels_import.py login")
+            raise SystemExit(t("알리에 로그인이 필요해요", "Please log in to AliExpress") + ": .venv/bin/python parcels_import.py login")
         orders = await ev(f"{LIST_JS}({DAYS})", 150) or []
         active = [o for o in orders if _status(o["text"]) not in ("done", "cancel")][:MAX_ORDERS]
         for o in active:
@@ -150,7 +152,7 @@ async def _collect() -> list[dict]:
                 await asyncio.sleep(6)
                 o["tracking_text"] = await ev("document.body.innerText.slice(0, 5000)") or ""
             except Exception as e:  # 하나가 실패해도 나머지는 계속
-                print(f"배송 조회 실패 {o['id']}: {e}", flush=True)
+                print(f"tracking lookup failed {o['id']}: {e}", flush=True)
                 o["tracking_text"] = ""
         await c.call("Target.closeTarget", {"targetId": tid})
         return active
@@ -267,7 +269,8 @@ if __name__ == "__main__":
             subprocess.run(["osascript", "-e", 'tell application "Google Chrome" to activate'], capture_output=True)
         else:
             launch(headless=False)
-        print("택배 전용 Chrome 창에서 알리에 로그인한 뒤 그 창을 닫아 주세요.")
+        print(t("택배 전용 Chrome 창에서 알리에 로그인한 뒤 그 창을 닫아 주세요.",
+                "Log in to AliExpress in the dedicated Chrome window, then close that window."))
     else:
         for g in run():
             print(g["status"], g["tracking"] or "-", g["eta"] or "-", g["title"])
