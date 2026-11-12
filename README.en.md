@@ -14,7 +14,7 @@
 **AI agents, LLM quotas and Mac health, on thirteen buttons on your desk.**<br>
 A macOS dashboard that drives the Ulanzi D200 directly, without the vendor app
 
-[한국어](README.md) · [Guide](docs/GUIDE.en.md) · [Features](#-features) · [Quick start](#-quick-start) · [Contributing](#-contributing)
+[한국어](README.md) · [日本語](README.ja.md) · [中文](README.zh-CN.md) · [Guide](docs/GUIDE.en.md) · [Features](#-features) · [Quick start](#-quick-start) · [Contributing](#-contributing)
 
 <br>
 

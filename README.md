@@ -14,7 +14,7 @@
 **AI 에이전트, LLM 한도, 맥 상태를 책상 위 13개의 버튼으로.**<br>
 Ulanzi D200을 공식 앱 없이 직접 제어하는 macOS 대시보드
 
-[English](README.en.md) · [사용 가이드](docs/GUIDE.md) · [기능](#-기능) · [빠른 시작](#-빠른-시작) · [기여하기](#-기여하기)
+[English](README.en.md) · [日本語](README.ja.md) · [中文](README.zh-CN.md) · [사용 가이드](docs/GUIDE.md) · [기능](#-기능) · [빠른 시작](#-빠른-시작) · [기여하기](#-기여하기)
 
 <br>
 
