@@ -27,6 +27,12 @@ WIDE = (458, 196)
 SAVE = Path.home() / ".cache" / "d200" / "games.json"
 
 GAMES = ["mole", "simon", "pairs", "slot", "bj", "poker", "race"]  # 메뉴 칸 순서 (0번 칸부터)
+try:  # AI 스타트업 타이쿤 (보드게임, tycoon.py). 고장 나도 나머지 게임은 그대로
+    from tycoon import Tycoon
+    GAMES.append("tycoon")
+except Exception as _te:
+    print(f"tycoon load error: {_te}", flush=True)
+    Tycoon = None
 LOWER_IS_BETTER = {"pairs"}  # 짝 맞추기는 시도 횟수가 적을수록 좋은 기록
 EMOJI_FONT = "/System/Library/Fonts/Apple Color Emoji.ttc"
 PAIR_CARDS = ["🐟", "🐙", "🦀", "🐢", "🦈"]  # 어항 친구들 5쌍
@@ -805,10 +811,13 @@ class Games:
         self.race_cam_left = 0.0
         self.race_lead: tuple[int, float] = (-1, 0.0)  # (선두 말, 선두가 바뀐 시각)
         self._race_tiles: tuple[tuple, list[bytes]] | None = None
+        self.tycoon = Tycoon(SAVE.parent / "tycoon.json") if Tycoon else None
 
     @property
     def active(self) -> bool:
         """시간이 흐르는 중인지 (게임 루프·화면보호기 판단용). 슬롯은 돌거나 당첨 연출 중일 때만."""
+        if self.mode == "tycoon" and self.tycoon:
+            return self.tycoon.active
         if self.mode == "slot":
             return any(self.spinning) or time.time() < self.win_until
         if self.mode == "bj":
@@ -882,6 +891,9 @@ class Games:
                 return
             if self.mode == "race":
                 self._press_race(idx, now)
+                return
+            if self.mode == "tycoon" and self.tycoon:
+                self.tycoon.press(idx, now)
                 return
             if idx >= BOARD:
                 return
@@ -1222,6 +1234,9 @@ class Games:
                 self.phase, self.peek_until, self.started = "play", now + 1.5, now
             elif mode == "race":
                 self._race_card()
+            elif mode == "tycoon" and self.tycoon:
+                self.phase = "play"
+                self.tycoon.start()
             elif mode == "poker":
                 self.phase, self.hand, self.opp, self.held = "bet", [], [], [False] * 5
             elif mode == "bj":
@@ -1267,6 +1282,8 @@ class Games:
             elif self.mode == "pairs":
                 if len(self.open) == 2 and now >= self.flip_back:
                     self.open = []
+            elif self.mode == "tycoon" and self.tycoon:
+                self.tycoon.tick(now)
             elif self.mode == "race":
                 if self.phase == "gate" and now >= self.race_start:
                     self.phase, self.race_t, self.race_last = "run", 0.0, now
@@ -1344,7 +1361,7 @@ class Games:
             if self.mode == "menu":
                 out = {i: blank_tile() for i in range(BOARD)}
                 for c, g in enumerate(GAMES):
-                    out[c] = menu_tile(g, self.best_text(g))
+                    out[c] = (self.tycoon.menu_tile() if g == "tycoon" and self.tycoon else menu_tile(g, self.best_text(g)))
                 return out
             now = time.time()
             if self.mode == "pairs":
@@ -1360,6 +1377,8 @@ class Games:
                 return out
             if self.mode == "race":
                 return self._race_tiles_now(now)
+            if self.mode == "tycoon" and self.tycoon:
+                return self.tycoon.tiles()
             if self.mode == "poker":
                 out = {}
                 glow_on = now < self.win_until and int(now * 5) % 2 == 0
@@ -1471,6 +1490,8 @@ class Games:
     @property
     def fullscreen(self) -> bool:
         """경마 슬로우 모션: 아래 줄 버튼·넓은 칸까지 화면 전체를 쓰는 중 (대시보드가 아래 줄을 게임에 넘긴다)."""
+        if self.mode == "tycoon" and self.tycoon:
+            return self.tycoon.fullscreen
         return self.mode == "race" and self.phase == "run" and self.race_cam in ("slow", "hold")
 
     def _race_big(self, now: float) -> tuple[dict[int, bytes], bytes | None]:
@@ -1578,6 +1599,8 @@ class Games:
                                               "가운데 버튼: 게임 중 메뉴로"], "#9ece6a")
             if self.mode == "race":
                 return self._race_wide()
+            if self.mode == "tycoon" and self.tycoon:
+                return self.tycoon.wide()
             if self.mode == "poker":
                 if self.phase in ("play", "opp"):
                     me = POKER_NAMES[poker_rank(self.hand)[0]]
@@ -1654,4 +1677,4 @@ class Games:
                     len(self.player), len(self.dealer), self.hole, self.result, self.bet, tuple(self.held),
                     tuple(self.hand), tuple(self.opp), tuple(self.race_pick), self.race_frame(now) if self.mode == "race" else 0,
                     math.ceil(self.race_start - now) if self.phase == "gate" else 0, tuple(self.race_names),
-                    self.race_cam)
+                    self.tycoon.key() if self.mode == "tycoon" and self.tycoon else None, self.race_cam)
