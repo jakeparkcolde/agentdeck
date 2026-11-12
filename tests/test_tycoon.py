@@ -19,7 +19,7 @@ class TycoonRulesTest(unittest.TestCase):
         cells = self.ty.CELLS
         self.assertEqual(len(cells), 32)
         self.assertEqual(sorted(self.ty.WINDOW_TILES), sorted(self.ty.BOARD_KEYS))  # 판 창 8칸 = 판 버튼
-        self.assertEqual(self.ty.window_start(0), 31)  # 말 한 칸 뒤부터
+        self.assertEqual([self.ty.window_start(p) for p in (0, 7, 8, 31)], [0, 0, 8, 24])  # 8칸씩 네 면
         for i in range(0, 32, 4):
             self.assertNotEqual(cells[i].kind, "company")  # 네 칸마다 특수 칸
         for grp in range(8):

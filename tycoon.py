@@ -384,13 +384,14 @@ def _ctext(d: _Draw, box: tuple, text: str, size: int, fill, index: int = 6, dy:
     d.text(((x0 + x1) // 2, (y0 + y1) // 2 + dy), text, font=_fit(d, text, size, x1 - x0 - 16, index), fill=fill, anchor="mm")
 
 
-# 판: 32칸 중 지금 움직이는 말 주변 8칸만 보여준다 (위 줄 → 오른쪽, 아래 줄 ← 로 이어지는 띠).
+# 판: 32칸을 8칸씩 네 면으로 나눠, 움직이는 말이 있는 면을 보여준다 (위 줄 → 오른쪽, 아래 줄 ← 로 이어지는 띠).
 WINDOW_TILES = [0, 1, 2, 3, 8, 7, 6, 5]
 
 
 def window_start(focus: int) -> int:
-    """말 한 칸 뒤부터 보여준다 (앞으로 갈 길이 더 많이 보이게)."""
-    return (focus - 1) % N
+    """판은 8칸씩 네 면. 말이 있는 면을 보여준다: 화면은 가만히 있고 말이 칸을 건너가며,
+    면 끝을 넘어가면 다음 면으로 넘긴다."""
+    return (focus // 8) * 8
 
 
 def here_any(tokens: list[int], i: int, g: Game) -> bool:
@@ -1077,12 +1078,15 @@ class Tycoon:
         cs, ox, oy = 17, 12, 22
         ring = [(x, 0) for x in range(10)] + [(9, y) for y in range(1, 8)] + [(x, 7) for x in range(8, -1, -1)] + \
                [(0, y) for y in range(6, 0, -1)]
+        shown = window_start(self.tokens[g.turn])
         for i, (gx, gy) in enumerate(ring):
             x, y = ox + gx * cs, oy + gy * cs
             o = g.owner.get(i)
             c = CELLS[i]
             col = g.players[o].color if o is not None else ((52, 56, 74) if c.kind == "company" else (34, 36, 50))
-            d.rounded_rectangle((x + 1, y + 1, x + cs - 1, y + cs - 1), 3, fill=col)
+            on = shown <= i < shown + 8  # 지금 덱에 보이는 면
+            d.rounded_rectangle((x + 1, y + 1, x + cs - 1, y + cs - 1), 3, fill=col,
+                                outline=(255, 255, 255) if on else None, width=1)
         for k, pos in enumerate(self.tokens):
             if g.players[k].out:
                 continue
