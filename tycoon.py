@@ -39,7 +39,7 @@ FW, FH = WIDE_X + WIDE[0], 3 * SIZE + 2 * GAP  # 화면 전체 캔버스
 BW, BH = 4 * SIZE + 3 * GAP, 2 * SIZE + GAP  # 판 캔버스 (왼쪽 4열 × 2줄)
 BOARD_KEYS = [0, 1, 2, 3, 5, 6, 7, 8]
 BTN_A, BTN_B = 4, 9
-FPS = 8
+FPS = 2  # 덱은 새 그림을 1초에 1~2장만 받아들인다 (더 보내면 화면이 밀림)
 EMOJI_FONT = "/System/Library/Fonts/Apple Color Emoji.ttc"
 
 START_CASH, PASS_BONUS, MAX_ROUNDS = 1500, 150, 24  # MAX_ROUNDS: 한 사람당 차례 수
@@ -1040,7 +1040,7 @@ class Tycoon:
             prog = min(1.0, (now - t0) / CUT_LEN[kind])
             out, self._wide = split_full(cut_frame(kind, prog, data))
         else:
-            blink = int(now * 2) % 2 == 0
+            blink = False  # 깜빡이면 매번 판 전체를 다시 보내야 해서 끔 (테두리로만 표시)
             start = window_start(self.tokens[self.g.turn])
             out = {tile: draw_cell(self.g, (start + n) % N, self.tokens, self.highlight, blink)
                    for n, tile in enumerate(WINDOW_TILES)}
