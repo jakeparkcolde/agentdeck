@@ -17,11 +17,12 @@ class TycoonRulesTest(unittest.TestCase):
 
     def test_board_shape(self):
         cells = self.ty.CELLS
-        self.assertEqual(len(cells), 16)
-        places = [self.ty.cell_place(i) for i in range(16)]
-        self.assertEqual(len(set(places)), 16)  # 겹치는 칸 없음
-        self.assertEqual({p[0] for p in places}, set(self.ty.BOARD_KEYS))  # 판 버튼 8칸에 두 곳씩
-        for grp in range(4):
+        self.assertEqual(len(cells), 32)
+        self.assertEqual(sorted(self.ty.WINDOW_TILES), sorted(self.ty.BOARD_KEYS))  # 판 창 8칸 = 판 버튼
+        self.assertEqual(self.ty.window_start(0), 31)  # 말 한 칸 뒤부터
+        for i in range(0, 32, 4):
+            self.assertNotEqual(cells[i].kind, "company")  # 네 칸마다 특수 칸
+        for grp in range(8):
             self.assertEqual(sum(1 for c in cells if c.group == grp), 3)
 
     def test_buy_rent_monopoly_and_upgrade(self):
@@ -40,7 +41,7 @@ class TycoonRulesTest(unittest.TestCase):
 
     def test_pass_start_bonus(self):
         g = self.game()
-        g.cur.pos = 14
+        g.cur.pos = 30
         self.assertTrue(g.move_to(2))
         self.assertEqual(g.cur.cash, self.ty.START_CASH + self.ty.PASS_BONUS)
         self.assertFalse(g.move_to(5))

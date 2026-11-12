@@ -1,14 +1,16 @@
 """AI 스타트업 타이쿤: 주사위를 굴려 AI 회사를 인수하고 'API 사용료'를 받는 보드게임 (나 + 컴퓨터 2명).
 
 화면
-- 평소: 판(16칸)을 위아래 두 줄의 왼쪽 네 칸씩(0~3, 5~8)에 한 장으로 그리고,
+- 평소: 판의 말 주변 8칸을 위아래 두 줄의 왼쪽 네 칸씩(0~3, 5~8)에 그리고,
   오른쪽 끝 두 칸(4, 9)은 버튼 (굴리기 / 인수 / 증설 / 넘어가기). 넓은 칸은 세 사람의 돈과 차례.
 - 연출: 주사위·찬스 카드·인수·사용료·파산·승패는 아래 줄과 넓은 칸까지 화면 전체를 쓴다.
 
 규칙 (짧게 끝나게)
-- 출발을 지나면 투자금 +100. 빈 회사에 서면 살 수 있고, 내 회사에 다시 서면 서버를 증설(2단계까지).
+- 판은 32칸 (AI 회사 24곳 · 8개 업종). 화면은 움직이는 말 주변 8칸을 따라가고, 넓은 칸에 판 전체 작은 지도.
+- 출발을 지나면 투자금 +150. 빈 회사에 서면 살 수 있고, 내 회사에 다시 서면 서버를 증설(2단계까지).
+- 특수 칸: 깜짝 뉴스(카드) · 서버 장애(한 번 쉬기) · AI 학회(상금) · 클라우드 정산(돈 내기) · 해커톤(한 번 더).
 - 남의 회사에 서면 API 사용료를 낸다. 같은 업종 3곳을 다 가지면 사용료 2배.
-- 돈이 모자라면 회사를 반값에 팔고, 그래도 모자라면 파산. 혼자 남거나 12바퀴가 지나면 자산이 많은 사람이 이긴다.
+- 돈이 모자라면 회사를 반값에 팔고, 그래도 모자라면 파산. 혼자 남거나 각자 24번 굴리면 자산이 많은 사람이 이긴다.
 """
 
 from __future__ import annotations
@@ -40,45 +42,69 @@ BTN_A, BTN_B = 4, 9
 FPS = 8
 EMOJI_FONT = "/System/Library/Fonts/Apple Color Emoji.ttc"
 
-START_CASH, PASS_BONUS, MAX_ROUNDS = 1000, 100, 12
+START_CASH, PASS_BONUS, MAX_ROUNDS = 1500, 150, 24  # MAX_ROUNDS: 한 사람당 차례 수
 BG = (14, 16, 24)
 INK = (230, 233, 245)
 DIM = (150, 156, 185)
 PLAYER_COLORS = [(229, 72, 77), (59, 130, 246), (46, 196, 160)]  # 나 · 컴퓨터1 · 컴퓨터2
-GROUP_COLORS = [(139, 92, 246), (59, 130, 246), (46, 196, 160), (234, 179, 8)]
+GROUP_COLORS = [(139, 92, 246), (236, 72, 153), (59, 130, 246), (20, 184, 166), (34, 197, 94), (234, 179, 8),
+                (249, 115, 22), (239, 68, 68)]
+ART = Path(__file__).parent / "assets" / "tycoon"  # agy(Antigravity) 로 만든 그림 256px WebP (없으면 이모지)
+BONUS, TAX = 100, 100
 
 
 @dataclass(frozen=True)
 class Cell:
-    kind: str  # start | company | chance | outage
+    kind: str  # start | company | chance | outage | bonus | tax | again
     name: str
-    emoji: str
+    emoji: str  # 그림 파일이 없을 때 대신 쓰는 이모지
+    art: str    # assets/tycoon/<art>.webp
     group: int = -1
     price: int = 0
 
 
-def _company(name_ko: str, name_en: str, emoji: str, group: int, price: int) -> Cell:
-    return Cell("company", t(name_ko, name_en), emoji, group, price)
+def _company(art: str, name: str, emoji: str, group: int, price: int) -> Cell:
+    return Cell("company", name, emoji, art, group, price)
 
 
-# 16칸, 시계 방향. 업종: 0 앱(싼 곳) · 1 플랫폼 · 2 하드웨어 · 3 인프라(비싼 곳)
+def _special(kind: str, art: str, name: str, emoji: str) -> Cell:
+    return Cell(kind, name, emoji, art)
+
+
+# 32칸, 시계 방향. 네 칸마다 특수 칸, 그 사이에 같은 업종 회사 세 곳 (뒤로 갈수록 비쌈)
 CELLS = [
-    Cell("start", t("출발", "Start"), "🚀"),
-    _company("챗봇", "Chatbot", "💬", 0, 100),
-    _company("번역 엔진", "Translator", "🌐", 0, 110),
-    _company("음성 비서", "Voice AI", "🎙️", 0, 120),
-    Cell("chance", t("깜짝 뉴스", "Breaking"), "📰"),
-    _company("이미지 생성", "Image Gen", "🎨", 1, 160),
-    _company("추천 엔진", "Recommender", "🎯", 1, 170),
-    _company("에이전트", "Agents", "🤖", 1, 180),
-    Cell("outage", t("서버 장애", "Outage"), "🔥"),
-    _company("로봇 팔", "Robot Arm", "🦾", 2, 220),
-    _company("자율주행", "Self-driving", "🚗", 2, 230),
-    _company("AI 칩", "AI Chip", "🧠", 2, 240),
-    Cell("chance", t("깜짝 뉴스", "Breaking"), "📰"),
-    _company("GPU 클라우드", "GPU Cloud", "☁️", 3, 300),
-    _company("데이터센터", "Data Center", "🏢", 3, 320),
-    _company("양자 연구소", "Quantum Lab", "⚛️", 3, 350),
+    _special("start", "start", t("출발", "Start"), "🚀"),
+    _company("chatbot", t("챗봇", "Chatbot"), "💬", 0, 100),
+    _company("translator", t("번역 엔진", "Translator"), "🌐", 0, 110),
+    _company("voice", t("음성 비서", "Voice AI"), "🎙️", 0, 120),
+    _special("chance", "news", t("깜짝 뉴스", "Breaking"), "📰"),
+    _company("imagegen", t("이미지 생성", "Image Gen"), "🎨", 1, 140),
+    _company("videogen", t("영상 생성", "Video Gen"), "🎬", 1, 150),
+    _company("musicgen", t("음악 생성", "Music Gen"), "🎵", 1, 160),
+    _special("outage", "outage", t("서버 장애", "Outage"), "🔥"),
+    _company("recommender", t("추천 엔진", "Recommender"), "🎯", 2, 180),
+    _company("search", t("검색 AI", "AI Search"), "🔎", 2, 190),
+    _company("agents", t("에이전트", "Agents"), "🤖", 2, 200),
+    _special("bonus", "conference", t("AI 학회", "AI Summit"), "🎤"),
+    _company("tutor", t("AI 튜터", "AI Tutor"), "🎓", 3, 220),
+    _company("medical", t("의료 영상", "Med Imaging"), "🩺", 3, 230),
+    _company("drug", t("신약 개발", "Drug Discovery"), "💊", 3, 240),
+    _special("chance", "news", t("깜짝 뉴스", "Breaking"), "📰"),
+    _company("selfdriving", t("자율주행", "Self-driving"), "🚗", 4, 260),
+    _company("drone", t("드론 배송", "Drone Delivery"), "🚁", 4, 270),
+    _company("robotaxi", t("로봇 택시", "Robotaxi"), "🚕", 4, 280),
+    _special("tax", "tax", t("클라우드 정산", "Cloud Bill"), "🧾"),
+    _company("robotarm", t("로봇 팔", "Robot Arm"), "🦾", 5, 300),
+    _company("aichip", t("AI 칩", "AI Chip"), "🧠", 5, 310),
+    _company("wearable", t("웨어러블", "Wearables"), "🕶️", 5, 320),
+    _special("chance", "news", t("깜짝 뉴스", "Breaking"), "📰"),
+    _company("gpucloud", t("GPU 클라우드", "GPU Cloud"), "☁️", 6, 340),
+    _company("datacenter", t("데이터센터", "Data Center"), "🏢", 6, 350),
+    _company("edge", t("엣지 서버", "Edge Servers"), "📡", 6, 360),
+    _special("again", "hackathon", t("해커톤", "Hackathon"), "💻"),
+    _company("quantum", t("양자 연구소", "Quantum Lab"), "⚛️", 7, 380),
+    _company("space", t("우주 AI", "Space AI"), "🛰️", 7, 400),
+    _company("agi", t("AGI 연구소", "AGI Lab"), "✨", 7, 420),
 ]
 N = len(CELLS)
 
@@ -88,20 +114,21 @@ class Card:
     title: str
     desc: str
     emoji: str
+    art: str
     kind: str  # cash | each | per_company | goto_start | outage | forward
     amount: int = 0
 
 
 CARDS = [
-    Card(t("투자 유치 성공", "Funding round!"), t("+200", "+200"), "💰", "cash", 200),
-    Card(t("해커톤 우승", "Won a hackathon"), t("+100", "+100"), "🏆", "cash", 100),
-    Card(t("클라우드 요금 폭탄", "Cloud bill shock"), t("-150", "-150"), "💸", "cash", -150),
-    Card(t("데이터 유출 과징금", "Data-leak fine"), t("-100", "-100"), "⚖️", "cash", -100),
-    Card(t("바이럴 대박", "Gone viral"), t("모두에게서 50씩", "50 from everyone"), "📈", "each", 50),
-    Card(t("인재 영입 전쟁", "Talent war"), t("회사마다 25씩 내기", "Pay 25 per company"), "🧑‍💻", "per_company", 25),
-    Card(t("IPO 축하", "IPO day"), t("출발로 이동 +100", "Go to Start, +100"), "🔔", "goto_start"),
-    Card(t("GPU 품귀", "GPU shortage"), t("서버 장애로 이동, 한 번 쉬기", "Go to Outage, skip a turn"), "🧯", "outage"),
-    Card(t("데모 데이 발표", "Demo day"), t("3칸 앞으로", "Move 3 forward"), "🎤", "forward", 3),
+    Card(t("투자 유치 성공", "Funding round!"), t("+200", "+200"), "💰", "card_funding", "cash", 200),
+    Card(t("해커톤 우승", "Won a hackathon"), t("+100", "+100"), "🏆", "card_hackathon", "cash", 100),
+    Card(t("클라우드 요금 폭탄", "Cloud bill shock"), t("-150", "-150"), "💸", "card_cloudbill", "cash", -150),
+    Card(t("데이터 유출 과징금", "Data-leak fine"), t("-100", "-100"), "⚖️", "card_fine", "cash", -100),
+    Card(t("바이럴 대박", "Gone viral"), t("모두에게서 50씩", "50 from everyone"), "📈", "card_viral", "each", 50),
+    Card(t("인재 영입 전쟁", "Talent war"), t("회사마다 25씩 내기", "Pay 25 per company"), "🧑‍💻", "card_talent", "per_company", 25),
+    Card(t("IPO 축하", "IPO day"), t(f"출발로 이동 +{PASS_BONUS}", f"Go to Start, +{PASS_BONUS}"), "🔔", "card_ipo", "goto_start"),
+    Card(t("GPU 품귀", "GPU shortage"), t("서버 장애로 이동, 한 번 쉬기", "Go to Outage, skip a turn"), "🧯", "card_gpu", "outage"),
+    Card(t("데모 데이 발표", "Demo day"), t("3칸 앞으로", "Move 3 forward"), "🎤", "card_demo", "forward", 3),
 ]
 
 
@@ -309,6 +336,29 @@ def _paste(base: Image.Image, ch: str, size: int, cx: int, cy: int) -> None:
     base.paste(e, (cx - e.width // 2, cy - e.height // 2), e)
 
 
+@lru_cache(maxsize=256)
+def _art(key: str, size: int, round_: bool = True) -> Image.Image | None:
+    """assets/tycoon/<key>.webp 를 정사각형으로 (모서리 둥글게). 없으면 None."""
+    f = ART / f"{key}.webp"
+    if not f.exists():
+        return None
+    im = Image.open(f).convert("RGBA").resize((size, size), Image.LANCZOS)
+    if round_:
+        mask = Image.new("L", (size, size), 0)
+        ImageDraw.Draw(mask).rounded_rectangle((0, 0, size - 1, size - 1), size // 5, fill=255)
+        im.putalpha(mask)
+    return im
+
+
+def _pic(base: Image.Image, art: str, emoji: str, size: int, cx: int, cy: int) -> None:
+    """그림이 있으면 그림, 없으면 이모지."""
+    a = _art(art, size)
+    if a is not None:
+        base.paste(a, (cx - size // 2, cy - size // 2), a)
+    else:
+        _paste(base, emoji, int(size * 0.8), cx, cy)
+
+
 def _box(c: int, r: int) -> tuple[int, int, int, int]:
     """화면 전체 캔버스에서 c열 r줄 칸의 자리 (칸 사이 테두리는 비워 둔다)."""
     x, y = c * (SIZE + GAP), r * (SIZE + GAP)
@@ -334,46 +384,49 @@ def _ctext(d: _Draw, box: tuple, text: str, size: int, fill, index: int = 6, dy:
     d.text(((x0 + x1) // 2, (y0 + y1) // 2 + dy), text, font=_fit(d, text, size, x1 - x0 - 16, index), fill=fill, anchor="mm")
 
 
-# 판: 버튼 8칸(위 0~3, 아래 5~8)에 회사 두 곳씩. 시계 방향으로 위 줄은 →, 아래 줄은 ←.
-TILE_OF = [BOARD_KEYS[k] for k in (0, 1, 2, 3)] + [BOARD_KEYS[k] for k in (7, 6, 5, 4)]
+# 판: 32칸 중 지금 움직이는 말 주변 8칸만 보여준다 (위 줄 → 오른쪽, 아래 줄 ← 로 이어지는 띠).
+WINDOW_TILES = [0, 1, 2, 3, 8, 7, 6, 5]
 
 
-def cell_place(i: int) -> tuple[int, int]:
-    """칸 i 가 그려지는 (버튼 번호, 왼쪽 0 / 오른쪽 1)."""
-    tile = TILE_OF[i // 2]
-    top = tile < 5
-    half = i % 2 if top else 1 - i % 2
-    return tile, half
+def window_start(focus: int) -> int:
+    """말 한 칸 뒤부터 보여준다 (앞으로 갈 길이 더 많이 보이게)."""
+    return (focus - 1) % N
 
 
-def draw_tile(g: Game, tile: int, tokens: list[int], highlight: int | None, blink: bool) -> bytes:
+def here_any(tokens: list[int], i: int, g: Game) -> bool:
+    return any(pos == i and not g.players[k].out for k, pos in enumerate(tokens))
+
+
+def draw_cell(g: Game, i: int, tokens: list[int], highlight: int | None, blink: bool) -> bytes:
     img = Image.new("RGB", (SIZE, SIZE), BG)
     d = _Draw(img)
-    for i in range(N):
-        t_, half = cell_place(i)
-        if t_ != tile:
-            continue
-        c = CELLS[i]
-        x0, x1 = half * 98 + 3, half * 98 + 95
-        o = g.owner.get(i)
-        fill = (30, 33, 46) if c.kind == "company" else (24, 26, 38)
-        if o is not None:
-            fill = _shade(g.players[o].color, 0.34)
-        if highlight == i and blink:
-            fill = _shade(fill, 1.9)
-        d.rounded_rectangle((x0, 3, x1, 193), 14, fill=fill, outline=(255, 255, 255) if highlight == i else None, width=3)
-        if c.kind == "company":
-            d.rounded_rectangle((x0, 3, x1, 15), 6, fill=GROUP_COLORS[c.group])
-        cx = (x0 + x1) // 2
-        _paste(img, c.emoji, 40, cx, 50)
-        d.text((cx, 96), c.name, font=_fit(d, c.name, 17, 86), fill=INK, anchor="mm")
-        if c.kind == "company":
-            sub = f"₩{c.price}" if o is None else f"₩{g.rent_at(i)}" + "▲" * g.level.get(i, 0)
-            d.text((cx, 122), sub, font=_fit(d, sub, 17, 86, 6), fill=DIM if o is None else INK, anchor="mm")
-        here = [k for k, pos in enumerate(tokens) if pos == i and not g.players[k].out]
-        for m, k in enumerate(here):
-            tx = cx + (m - (len(here) - 1) / 2) * 26
-            d.ellipse((tx - 11, 158, tx + 11, 180), fill=g.players[k].color, outline=(255, 255, 255), width=3)
+    c = CELLS[i]
+    o = g.owner.get(i)
+    fill = (30, 33, 46) if c.kind == "company" else (24, 26, 38)
+    if o is not None:
+        fill = _shade(g.players[o].color, 0.36)
+    if highlight == i and blink:
+        fill = _shade(fill, 1.8)
+    d.rounded_rectangle((3, 3, 193, 193), 18, fill=fill, outline=(255, 255, 255) if highlight == i else None, width=4)
+    if c.kind == "company":
+        d.rounded_rectangle((3, 3, 193, 17), 8, fill=GROUP_COLORS[c.group])
+    _pic(img, c.art, c.emoji, 92, 84 if here_any(tokens, i, g) else 98, 76)
+    d.text((98, 140), c.name, font=_fit(d, c.name, 21, 178), fill=INK, anchor="mm")
+    if c.kind == "company":
+        sub = f"₩{c.price}" if o is None else f"₩{g.rent_at(i)}" + " ▲" * g.level.get(i, 0)
+        d.text((98, 166), sub, font=_fit(d, sub, 19, 178, 6), fill=DIM if o is None else INK, anchor="mm")
+    else:
+        hint = {"start": t(f"지나면 +{PASS_BONUS}", f"pass +{PASS_BONUS}"), "chance": t("카드 뽑기", "draw a card"),
+                "outage": t("한 번 쉬기", "skip a turn"), "bonus": t(f"상금 +{BONUS}", f"prize +{BONUS}"),
+                "tax": t(f"정산 -{TAX}", f"pay -{TAX}"), "again": t("한 번 더", "roll again")}[c.kind]
+        d.text((98, 166), hint, font=_fit(d, hint, 17, 178, 2), fill=DIM, anchor="mm")
+    here = [k for k, pos in enumerate(tokens) if pos == i and not g.players[k].out]
+    for m, k in enumerate(here):  # 말은 오른쪽 위 모서리부터 왼쪽으로 (그림을 가리지 않게)
+        tx, ty = 168 - m * 40, 34
+        a = _art(("token_me", "token_cpu1", "token_cpu2")[k], 38)
+        d.ellipse((tx - 21, ty - 21, tx + 21, ty + 21), fill=g.players[k].color, outline=(255, 255, 255), width=3)
+        if a is not None:
+            img.paste(a, (int(tx - 19), int(ty - 19)), a)
     return _png(img)
 
 
@@ -421,6 +474,112 @@ def _wide_card(d: _Draw, title: str, lines: list[tuple[str, int, tuple]], bg: tu
         y += int(size * 1.25)
 
 
+# ---------- 칸마다 어울리는 움직임 (인수·증설·사용료 장면에서 그림 뒤에 그린다) ----------
+CELL_FX = {
+    "chatbot": "bubbles", "translator": "orbit", "voice": "waves", "imagegen": "sparkle", "videogen": "rays",
+    "musicgen": "waves", "recommender": "rays", "search": "rain", "agents": "sparkle", "tutor": "rain",
+    "medical": "heartbeat", "drug": "bubbles", "selfdriving": "speed", "drone": "speed", "robotaxi": "speed",
+    "robotarm": "gears", "aichip": "circuit", "wearable": "sparkle", "gpucloud": "circuit", "datacenter": "circuit",
+    "edge": "waves", "quantum": "orbit", "space": "orbit", "agi": "rays",
+    "start": "speed", "conference": "rays", "hackathon": "sparkle", "tax": "rain", "outage": "bubbles", "news": "rays",
+}
+
+
+def _mix(c: tuple, k: float) -> tuple:
+    """배경(어두운 색)과 섞인 정도 k (0~1) 로 색을 흐리게 = 투명도 흉내."""
+    bg = (8, 9, 14)
+    k = max(0.0, min(1.0, k))
+    return tuple(int(bg[i] + (c[i] - bg[i]) * k) for i in range(3))
+
+
+def draw_fx(d: ImageDraw.ImageDraw, kind: str, prog: float, cx: float, cy: float, color: tuple, seed: str) -> None:
+    rnd = random.Random(seed)
+    tt = prog * 3.0  # 장면 안에서 흐르는 시간
+    if kind == "waves":  # 퍼지는 동심원 (소리·전파)
+        for k in range(6):
+            ph = (tt * 0.9 + k / 6) % 1.0
+            r = 90 + ph * 300
+            d.ellipse((cx - r, cy - r * 0.7, cx + r, cy + r * 0.7), outline=_mix(color, 1 - ph), width=6)
+    elif kind == "bubbles":  # 떠오르는 방울 (대화·약)
+        for k in range(26):
+            x = cx + rnd.uniform(-330, 330)
+            sp = rnd.uniform(0.6, 1.4)
+            y = cy + 260 - ((tt * 160 * sp + rnd.uniform(0, 420)) % 420)
+            r = rnd.uniform(8, 26)
+            d.ellipse((x - r, y - r, x + r, y + r), outline=_mix(color, 0.9), width=4)
+    elif kind == "orbit":  # 궤도를 도는 입자 (번역·양자·우주)
+        for ring in range(3):
+            rx, ry = 150 + ring * 70, 60 + ring * 30
+            d.ellipse((cx - rx, cy - ry, cx + rx, cy + ry), outline=_mix(color, 0.35), width=2)
+            for k in range(2):
+                a = tt * (2.2 - ring * 0.5) + k * math.pi + ring
+                x, y = cx + rx * math.cos(a), cy + ry * math.sin(a)
+                d.ellipse((x - 11, y - 11, x + 11, y + 11), fill=_mix(color, 1.0))
+    elif kind == "sparkle":  # 반짝이는 별 (생성·AGI)
+        for k in range(22):
+            x, y = cx + rnd.uniform(-360, 360), cy + rnd.uniform(-90, 330)
+            tw = (math.sin(tt * 6 + k * 1.7) + 1) / 2
+            r = 6 + 20 * tw
+            col = _mix(rnd.choice([color, (255, 255, 255), (250, 204, 21)]), 0.4 + 0.6 * tw)
+            d.polygon([(x, y - r), (x + r * 0.25, y - r * 0.25), (x + r, y), (x + r * 0.25, y + r * 0.25),
+                       (x, y + r), (x - r * 0.25, y + r * 0.25), (x - r, y), (x - r * 0.25, y - r * 0.25)], fill=col)
+    elif kind == "rays":  # 돌아가는 빛줄기 (발표·추천·에이전트)
+        for k in range(14):
+            a = tt * 0.8 + k * (2 * math.pi / 14)
+            a2 = a + 0.12
+            r = 420
+            d.polygon([(cx, cy), (cx + r * math.cos(a), cy + r * math.sin(a)), (cx + r * math.cos(a2), cy + r * math.sin(a2))],
+                      fill=_mix(color, 0.28 if k % 2 else 0.16))
+    elif kind == "rain":  # 쏟아지는 데이터 조각 (검색·학습)
+        for k in range(40):
+            x = cx + rnd.uniform(-360, 360)
+            y = cy - 120 + ((tt * 260 * rnd.uniform(0.7, 1.3) + rnd.uniform(0, 520)) % 520)
+            w = rnd.choice((16, 24, 32))
+            d.rounded_rectangle((x, y, x + w, y + 9), 4, fill=_mix(color, rnd.uniform(0.4, 1.0)))
+    elif kind == "speed":  # 지나가는 속도선 (자율주행·드론·로켓)
+        for k in range(24):
+            y = cy + rnd.uniform(-100, 320)
+            ln = rnd.uniform(80, 220)
+            x = cx + 420 - ((tt * 900 * rnd.uniform(0.8, 1.4) + rnd.uniform(0, 900)) % 900)
+            d.line((x, y, x + ln, y), fill=_mix(color, rnd.uniform(0.35, 0.9)), width=rnd.choice((3, 5, 7)))
+    elif kind == "circuit":  # 회로를 따라 달리는 불빛 (칩·데이터센터·클라우드)
+        for k in range(10):
+            a = k * (2 * math.pi / 10) + 0.3
+            x1, y1 = cx + 120 * math.cos(a), cy + 90 * math.sin(a)
+            x2, y2 = cx + 380 * math.cos(a), cy + 300 * math.sin(a)
+            xm = x2
+            d.line((x1, y1, xm, y1, x2, y2), fill=_mix(color, 0.35), width=4)
+            ph = (tt * 0.9 + k * 0.13) % 1.0
+            px = x1 + (xm - x1) * min(1.0, ph * 2)
+            py = y1 if ph < 0.5 else y1 + (y2 - y1) * (ph - 0.5) * 2
+            d.ellipse((px - 9, py - 9, px + 9, py + 9), fill=_mix((255, 255, 255), 1.0))
+            d.ellipse((x2 - 7, y2 - 7, x2 + 7, y2 + 7), fill=_mix(color, 0.8))
+    elif kind == "heartbeat":  # 심전도 (의료)
+        pts = []
+        for k in range(120):
+            x = cx - 420 + k * 7
+            u = (k / 120 * 3 - tt) % 1.0
+            y = cy - (90 if 0.45 < u < 0.5 else -50 if 0.5 <= u < 0.55 else 0)  # 그림 줄을 가로지르게
+            pts.append((x, y))
+        d.line(pts, fill=_mix(color, 0.95), width=6)
+    elif kind == "gears":  # 맞물려 도는 톱니 (로봇)
+        for k, (gx, gy, gr, sp) in enumerate(((cx - 260, cy + 160, 80, 1), (cx + 250, cy + 150, 100, -0.8),
+                                               (cx - 300, cy - 30, 55, -1.4), (cx + 300, cy - 40, 60, 1.3))):
+            teeth = 10
+            pts = []
+            for j in range(teeth * 2):
+                a = tt * sp + j * math.pi / teeth
+                r = gr if j % 2 else gr * 0.78
+                pts.append((gx + r * math.cos(a), gy + r * math.sin(a)))
+            d.polygon(pts, outline=_mix(color, 0.8), width=5)
+            d.ellipse((gx - gr * 0.25, gy - gr * 0.25, gx + gr * 0.25, gy + gr * 0.25), outline=_mix(color, 0.8), width=5)
+
+
+def cell_fx(d: ImageDraw.ImageDraw, cell: Cell, prog: float, cx: float, cy: float) -> None:
+    color = GROUP_COLORS[cell.group] if cell.group >= 0 else (234, 179, 8)
+    draw_fx(d, CELL_FX.get(cell.art, "sparkle"), prog, cx, cy, color, cell.art)
+
+
 def cut_frame(kind: str, prog: float, data: dict) -> Image.Image:
     """화면 전체 연출 한 장 (prog 0~1). 그림은 칸 안에, 긴 글은 테두리 없는 넓은 칸에."""
     img = Image.new("RGB", (FW, FH), (8, 9, 14))
@@ -452,7 +611,7 @@ def cut_frame(kind: str, prog: float, data: dict) -> Image.Image:
         face_up = flip >= 0.5
         d.rounded_rectangle((cx - w / 2, by0, cx + max(w, 4) / 2, by1), 30, fill=(250, 248, 240) if face_up else (60, 50, 120))
         if flip >= 1:
-            _paste(img, c.emoji, 150, *_mid(_box(2, 0)))
+            _pic(img, c.art, c.emoji, 180, *_mid(_box(2, 0)))
             if len(c.desc) <= 8:  # "+200" 처럼 짧으면 크게
                 _ctext(d, _box(2, 1), c.desc, 56, (20, 20, 28))
             else:
@@ -465,11 +624,9 @@ def cut_frame(kind: str, prog: float, data: dict) -> Image.Image:
     elif kind in ("buy", "upgrade"):
         cell: Cell = data["cell"]
         pop = min(1.0, prog / 0.25)
-        _paste(img, cell.emoji, int(60 + 110 * pop), *_mid(_box(2, 0)))
+        cell_fx(d, cell, prog, *_mid(_box(2, 0)))
+        _pic(img, cell.art, cell.emoji, int(70 + 120 * pop), *_mid(_box(2, 0)))
         _ctext(d, _box(2, 1), cell.name, 34, INK)
-        for c in (1, 3):  # 양옆 칸에 반짝임
-            if prog > 0.3:
-                _paste(img, "✨", 90, *_mid(_box(c, 0 if c == 1 else 1)))
         stamp = t("인수 완료!", "Acquired!") if kind == "buy" else t("서버 증설!", "Scaled up!")
         _wide_card(d, who, [(stamp if prog > 0.3 else "…", 56, color)], (20, 22, 32), color)
     elif kind == "rent":
@@ -477,7 +634,8 @@ def cut_frame(kind: str, prog: float, data: dict) -> Image.Image:
         amt = data["amount"]
         if int(prog * 8) % 2 == 0 and prog < 0.5:
             d.rectangle((0, 0, FW, FH), fill=(60, 14, 18))
-        _paste(img, cell.emoji, 150, *_mid(_box(2, 0)))
+        cell_fx(d, cell, prog, *_mid(_box(2, 0)))
+        _pic(img, cell.art, cell.emoji, 180, *_mid(_box(2, 0)))
         payer, payee = data.get("from", ("", color)), data.get("to", ("", color))
         for (name, col), c in ((payer, 1), (payee, 3)):
             x0, y0, x1, y1 = _box(c, 1)
@@ -487,14 +645,16 @@ def cut_frame(kind: str, prog: float, data: dict) -> Image.Image:
         shown = int(amt * min(1.0, prog / 0.5))
         _wide_card(d, t("API 사용료", "API fee"), [(f"₩{shown}", 80, (229, 72, 77))], (20, 22, 32), DIM)
     elif kind == "pass":
-        _paste(img, "🚀", int(110 + 50 * min(1.0, prog * 2)), *_mid(_box(2, 0)))
+        _pic(img, data.get("art", "start"), data.get("emoji", "🚀"), int(120 + 50 * min(1.0, prog * 2)), *_mid(_box(2, 0)))
         _paste(img, "💰", 110, *_mid(_box(2, 1)))
-        _wide_card(d, who, [(t("투자 라운드 +100", "Funding +100"), 48, (46, 196, 160))], (20, 22, 32), color)
+        _wide_card(d, who, [(data.get("text") or t(f"투자 라운드 +{PASS_BONUS}", f"Funding +{PASS_BONUS}"), 48, (46, 196, 160))],
+                   (20, 22, 32), color)
     elif kind == "outage":
         if int(prog * 10) % 2 == 0:
             d.rectangle((0, 0, FW, FH), fill=(40, 10, 10))
-        for c, r in ((1, 1), (2, 0), (3, 1)):
-            _paste(img, "🔥", 150, *_mid(_box(c, r)))
+        _pic(img, "outage", "🔥", 190, *_mid(_box(2, 0)))
+        for c in (1, 3):
+            _paste(img, "🔥", 120, *_mid(_box(c, 1)))
         _wide_card(d, t("서버 장애!", "Outage!"), [(t("한 번 쉬어요", "Skip a turn"), 48, (255, 140, 90))], (30, 12, 12), (255, 140, 90))
     elif kind == "bankrupt":
         _paste(img, "📉", 160, *_mid(_box(2, 0)))
@@ -502,19 +662,22 @@ def cut_frame(kind: str, prog: float, data: dict) -> Image.Image:
     elif kind in ("win", "lose"):
         rk: list = data["ranking"]
         win = kind == "win"
-        _paste(img, "🏆" if win else "😵", 160, *_mid(_box(2, 0)))
+        _pic(img, "win" if win else "lose", "🏆" if win else "😵", 190, *_mid(_box(2, 0)))
         for place, (c, medal) in enumerate(((2, "🥇"), (1, "🥈"), (3, "🥉"))):
             if place < len(rk):
                 name, value, col = rk[place]
                 x0, y0, x1, y1 = _box(c, 1)
-                _paste(img, medal, 80, (x0 + x1) // 2, y0 + 56)
+                _paste(img, medal, 70, (x0 + x1) // 2 - 36, y0 + 50)
+                tok = _art(("token_me", "token_cpu1", "token_cpu2")[data.get("who_idx", [0, 1, 2])[place]], 76)
+                if tok is not None:
+                    img.paste(tok, ((x0 + x1) // 2 + 2, y0 + 12), tok)
                 _ctext(d, (x0, y0 + 100, x1, y0 + 140), name, 28, col)
                 _ctext(d, (x0, y0 + 140, x1, y1), f"₩{value}", 26, INK)
         _wide_card(d, t("게임 끝", "Game over"),
                    [(t("유니콘 등극!", "You're a unicorn!") if win else t("다음 라운드를 노려요", "Better luck next time"), 46,
                      (234, 179, 8) if win else DIM)], (20, 22, 32), DIM)
     elif kind == "title":
-        _paste(img, "🦄", int(120 + 40 * min(1.0, prog * 2)), *_mid(_box(2, 0)))
+        _pic(img, "title", "🦄", int(150 + 40 * min(1.0, prog * 2)), *_mid(_box(2, 0)))
         _paste(img, "🎲", 110, *_mid(_box(1, 1)))
         _paste(img, "💰", 110, *_mid(_box(3, 1)))
         _paste(img, "🤖", 110, *_mid(_box(2, 1)))
@@ -578,8 +741,7 @@ class Tycoon:
     def menu_tile(self) -> bytes:
         img = Image.new("RGB", (SIZE, SIZE), (24, 26, 38))
         d = _Draw(img)
-        _paste(img, "🦄", 70, 98, 90)
-        _paste(img, "🎲", 40, 150, 120)
+        _pic(img, "title", "🦄", 120, 98, 96)
         d.text((98, 22), t("AI 타이쿤", "AI Tycoon"), font=_kr(24, 6), fill=INK, anchor="mm")
         w = self.stats.get("wins", 0)
         d.text((98, 172), t(f"우승 {w}번", f"{w} wins") if w else t("새 게임", "New game"), font=_kr(20, 4), fill=DIM, anchor="mm")
@@ -682,7 +844,7 @@ class Tycoon:
             self._later(0.7, self._turn)
         else:
             self.phase = "roll"
-            self.log = (t("내 차례", "Your turn"), t("🎲 를 눌러 굴리세요", "Press 🎲 to roll"))
+            self.log = (t("내 차례", "Your turn"), t("오른쪽 위 굴리기를 누르세요", "Press Roll (top right)"))
             self._bump()
 
     def _turn(self) -> None:
@@ -704,7 +866,7 @@ class Tycoon:
         if not self.fast:
             play("tick", 0)
         if passed:
-            self.log = (t(f"{g.cur.name}: 투자 라운드 +100", f"{g.cur.name}: funding +100"), "")
+            self.log = (t(f"{g.cur.name}: 투자 라운드 +{PASS_BONUS}", f"{g.cur.name}: funding +{PASS_BONUS}"), "")
             if not self.fast:
                 play("coin", 0)
         self._bump()
@@ -738,6 +900,19 @@ class Tycoon:
             card = g.draw()
             self._show("card", {"card": card})
             self._later(0.0, lambda: self._apply_card(card))
+            return
+        elif c.kind == "bonus":
+            p.cash += BONUS
+            self.log = (t(f"{p.name}: AI 학회 발표 상금 +{BONUS}", f"{p.name}: summit prize +{BONUS}"), c.name)
+            self._show("pass", {"who": p.name, "color": p.color, "text": t(f"학회 상금 +{BONUS}", f"Prize +{BONUS}"), "art": "conference", "emoji": "🎤"})
+        elif c.kind == "tax":
+            p.cash -= TAX
+            self.log = (t(f"{p.name}: 클라우드 정산 -{TAX}", f"{p.name}: cloud bill -{TAX}"), c.name)
+            self._later(0.0, self._check_debt)
+        elif c.kind == "again":
+            self.log = (t(f"{p.name}: 해커톤! 한 번 더", f"{p.name}: hackathon! roll again"), c.name)
+            self._bump()
+            self._later(0.8, self._my_turn_or_cpu)  # 차례를 넘기지 않음
             return
         elif c.kind == "outage":
             p.skip = True
@@ -827,7 +1002,7 @@ class Tycoon:
         self.phase = "over"
         rows = [(g.players[k].name, g.assets(k) if not g.players[k].out else 0, g.players[k].color) for k in rk]
         self.log = (t("게임 끝", "Game over"), t("아무 칸: 새 게임", "Any key: new game"))
-        self._show("win" if win else "lose", {"ranking": rows})
+        self._show("win" if win else "lose", {"ranking": rows, "who_idx": rk})
         self._bump()
 
     # ---- 시간 ----
@@ -866,7 +1041,9 @@ class Tycoon:
             out, self._wide = split_full(cut_frame(kind, prog, data))
         else:
             blink = int(now * 2) % 2 == 0
-            out = {k: draw_tile(self.g, k, self.tokens, self.highlight, blink) for k in BOARD_KEYS}
+            start = window_start(self.tokens[self.g.turn])
+            out = {tile: draw_cell(self.g, (start + n) % N, self.tokens, self.highlight, blink)
+                   for n, tile in enumerate(WINDOW_TILES)}
             out[BTN_A], out[BTN_B] = self._buttons()
         self._cache = (k, out)
         return out
@@ -896,20 +1073,36 @@ class Tycoon:
         g = self.g
         img = Image.new("RGB", WIDE, (13, 14, 20))
         d = _Draw(img)
+        # 왼쪽: 판 전체 작은 지도 (10×8 테두리 = 32칸), 주인 색 + 말 위치
+        cs, ox, oy = 17, 12, 22
+        ring = [(x, 0) for x in range(10)] + [(9, y) for y in range(1, 8)] + [(x, 7) for x in range(8, -1, -1)] + \
+               [(0, y) for y in range(6, 0, -1)]
+        for i, (gx, gy) in enumerate(ring):
+            x, y = ox + gx * cs, oy + gy * cs
+            o = g.owner.get(i)
+            c = CELLS[i]
+            col = g.players[o].color if o is not None else ((52, 56, 74) if c.kind == "company" else (34, 36, 50))
+            d.rounded_rectangle((x + 1, y + 1, x + cs - 1, y + cs - 1), 3, fill=col)
+        for k, pos in enumerate(self.tokens):
+            if g.players[k].out:
+                continue
+            gx, gy = ring[pos]
+            x, y = ox + gx * cs + cs // 2 + (k - 1) * 4, oy + gy * cs + cs // 2
+            d.ellipse((x - 5, y - 5, x + 5, y + 5), fill=g.players[k].color, outline=(255, 255, 255), width=2)
+        d.text((ox + 5 * cs, oy + 4 * cs), t(f"{min(g.rounds + 1, MAX_ROUNDS)}/{MAX_ROUNDS}턴", f"turn {min(g.rounds + 1, MAX_ROUNDS)}/{MAX_ROUNDS}"),
+               font=_kr(15, 4), fill=DIM, anchor="mm")
+        # 오른쪽: 소식 + 세 사람
+        tx = 196
         big, small = self.log
-        d.text((20, 22), big, font=_fit(d, big, 24, 418), fill=INK, anchor="lm")
+        d.text((tx, 24), big, font=_fit(d, big, 21, WIDE[0] - tx - 12), fill=INK, anchor="lm")
         if small:
-            d.text((20, 52), small, font=_fit(d, small, 19, 418, 2), fill=DIM, anchor="lm")
+            d.text((tx, 50), small, font=_fit(d, small, 16, WIDE[0] - tx - 12, 2), fill=DIM, anchor="lm")
         for k, p in enumerate(g.players):
-            y = 92 + k * 36
+            y = 92 + k * 34
             if g.turn == k and self.phase != "over":
-                d.rounded_rectangle((8, y - 16, WIDE[0] - 8, y + 16), 10, fill=(30, 33, 48))
-            d.ellipse((20, y - 9, 38, y + 9), fill=p.color)
-            d.text((48, y), p.name, font=_kr(20, 6), fill=DIM if p.out else INK, anchor="lm")
-            n = sum(1 for o in g.owner.values() if o == k)
-            d.text((290, y), t(f"회사 {n}", f"{n} co."), font=_kr(17, 2), fill=DIM, anchor="rm")
-            d.text((WIDE[0] - 20, y), t("파산", "bust") if p.out else f"₩{p.cash}", font=_kr(22, 6),
-                   fill=(229, 72, 77) if p.out or p.cash < 100 else INK, anchor="rm")
-        d.text((WIDE[0] - 20, 186), t(f"{min(g.rounds + 1, MAX_ROUNDS)}/{MAX_ROUNDS} 바퀴", f"lap {min(g.rounds + 1, MAX_ROUNDS)}/{MAX_ROUNDS}"),
-               font=_kr(14, 2), fill=DIM, anchor="rm")
+                d.rounded_rectangle((tx - 8, y - 15, WIDE[0] - 6, y + 15), 10, fill=(30, 33, 48))
+            d.ellipse((tx, y - 8, tx + 16, y + 8), fill=p.color)
+            d.text((tx + 24, y), p.name, font=_fit(d, p.name, 18, 110), fill=DIM if p.out else INK, anchor="lm")
+            d.text((WIDE[0] - 14, y), t("파산", "bust") if p.out else f"₩{p.cash}", font=_kr(20, 6),
+                   fill=(229, 72, 77) if p.out or p.cash < 150 else INK, anchor="rm")
         return _png(img)
