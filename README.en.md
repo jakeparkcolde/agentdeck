@@ -20,6 +20,9 @@ A macOS dashboard that drives the Ulanzi D200 directly, without the vendor app
 
 <img src="docs/images/hero.en.gif" alt="Demo" width="85%">
 
+<a href="docs/video/agentdeck-intro.en.mp4"><img src="docs/images/intro-poster.en.png" alt="▶ 40-second intro video (with sound) — click to watch" width="85%"></a><br>
+<sub>▶ 40-second intro video (with sound) — click to watch</sub>
+
 </div>
 
 <br>

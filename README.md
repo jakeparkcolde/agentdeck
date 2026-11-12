@@ -20,6 +20,9 @@ Ulanzi D200을 공식 앱 없이 직접 제어하는 macOS 대시보드
 
 <img src="docs/images/hero.gif" alt="데모" width="85%">
 
+<a href="docs/video/agentdeck-intro.mp4"><img src="docs/images/intro-poster.png" alt="▶ 소개 영상 40초 (소리 있음) — 눌러서 보기" width="85%"></a><br>
+<sub>▶ 소개 영상 40초 (소리 있음) — 눌러서 보기</sub>
+
 </div>
 
 <br>

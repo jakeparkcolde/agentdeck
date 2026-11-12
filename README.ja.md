@@ -20,6 +20,9 @@
 
 <img src="docs/images/hero.en.gif" alt="デモ" width="85%">
 
+<a href="docs/video/agentdeck-intro.en.mp4"><img src="docs/images/intro-poster.en.png" alt="▶ 40秒の紹介動画（英語・音声あり）— クリックで再生" width="85%"></a><br>
+<sub>▶ 40秒の紹介動画（英語・音声あり）— クリックで再生</sub>
+
 </div>
 
 <br>

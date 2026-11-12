@@ -20,6 +20,9 @@
 
 <img src="docs/images/hero.en.gif" alt="演示" width="85%">
 
+<a href="docs/video/agentdeck-intro.en.mp4"><img src="docs/images/intro-poster.en.png" alt="▶ 40 秒介绍视频（英文，有声音）— 点击观看" width="85%"></a><br>
+<sub>▶ 40 秒介绍视频（英文，有声音）— 点击观看</sub>
+
 </div>
 
 <br>
