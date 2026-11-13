@@ -75,7 +75,7 @@ Claude、Codex 和 agy 的 **5 小时与每周剩余额度**（可选：Google F
 <td valign="top">
 
 ### 工作树
-git worktree 按 **已失效、可合并、较旧、活跃** 分组。长按两次即可删除已合并的工作树，或让主智能体帮忙整理。
+git worktree 按 **已失效、可合并、较旧、活跃** 分组。按两次即可删除已合并的工作树，或让主智能体帮忙整理。
 
 <sub>→ [指南：工作树](docs/GUIDE.en.md#43-worktrees)</sub>
 

@@ -75,7 +75,7 @@ Agent status and running count per project
 <td valign="top">
 
 ### Worktrees
-git worktrees grouped as **stale, mergeable, old, active**. Hold twice to remove a merged worktree or ask the lead agent to tidy up.
+git worktrees grouped as **stale, mergeable, old, active**. Press twice to remove a merged worktree or ask the lead agent to tidy up.
 
 <sub>→ [Guide: worktrees](docs/GUIDE.en.md#43-worktrees)</sub>
 

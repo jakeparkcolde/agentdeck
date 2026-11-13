@@ -208,15 +208,15 @@ If you manage agents with [Herdr](https://herdr.dev), this mode gives you more:
 
 **Press the wide tile on page 3** to open it. Git worktrees grouped by state:
 
-| State | Meaning | Hold twice to |
+| State | Meaning | Press twice to |
 |---|---|---|
 | Stale | Uncommitted changes and nobody working on it | Ask the lead agent to tidy up |
 | Mergeable | Fully merged into main, no changes | Remove the worktree (branch is kept) |
 | Old | Unmerged commits, untouched for 3+ days | Ask to tidy up |
 | Working | An agent is working in that folder | Ask to tidy up |
 
-- **Tap** to open the worktree.
-- **Hold once to arm (red), then hold again within 10 seconds to run.** This prevents accidental deletes.
+- **Press once to arm (red), then press again within 10 seconds to run.** This prevents accidental deletes.
+- **Hold** to open the worktree in Herdr.
 - To enable, set `studio.host` (where the worktrees live) and `studio.worktree_globs` (where to look). Cleanup requests go to `studio.lead_pane`, which currently needs Herdr.
 
 ### 4.4 Machines and device detail (page 4)

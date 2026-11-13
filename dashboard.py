@@ -606,19 +606,19 @@ class Dashboard:
         if idx >= len(items):
             return
         w = items[idx]
-        if held < LONG_PRESS:  # 짧게: Herdr 에서 열기
+        if held >= LONG_PRESS:  # 길게: Herdr 에서 열기 (짧게 = 정리, 한 번 더 누르면 실행)
             self.wt_armed = None
             tower = next((x for x in self.raw_studio.workspaces if x.name == TOWER_SPACE), None)
             self.pool.submit(open_in_herdr, w, tower.space_id if tower else None)
             return
         action = "remove" if w.can_remove else "ask"
         path, armed_action = self.armed_now()
-        if path != w.path:  # 길게 첫 번째: 확인 대기
+        if path != w.path:  # 첫 번째: 확인 대기
             self.wt_armed = (w.path, action, time.time() + ARM_SEC)
             what = "워크트리 삭제 (브랜치는 유지)" if action == "remove" else "리드 에이전트에게 정리 요청 전송"
-            self.toast("확인 필요", [f"{w.repo}/{w.name}", what, f"{ARM_SEC}초 안에 길게 한 번 더"], "#f7768e", ARM_SEC)
+            self.toast("확인 필요", [f"{w.repo}/{w.name}", what, f"{ARM_SEC}초 안에 한 번 더 누르면 실행"], "#f7768e", ARM_SEC)
             return
-        self.wt_armed = None  # 길게 두 번째: 실행
+        self.wt_armed = None  # 두 번째: 실행
         self.toast("실행 중…", [f"{w.repo}/{w.name}"], "#e0af68", 30)
 
         def run() -> None:
@@ -904,9 +904,9 @@ class Dashboard:
                     if self.wt_msg and time.time() < self.wt_msg[3]:
                         small = render_message(*self.wt_msg[:3])
                     else:
-                        small = render_message("워크트리", ["짧게: Herdr 에서 열기",
-                                                         "길게 2번: 정리 가능 → 삭제",
-                                                         "길게 2번: 그 외 → 총괄에 정리 요청"])
+                        small = render_message("워크트리", ["누르기 2번: 정리 가능 → 삭제",
+                                                         "누르기 2번: 그 외 → 총괄에 정리 요청",
+                                                         "길게: Herdr 에서 열기"])
                 elif self.wt_msg and time.time() < self.wt_msg[3]:  # 알림(업데이트 등)이 있으면 잠깐 대신 표시
                     small = render_message(*self.wt_msg[:3])
                 else:
