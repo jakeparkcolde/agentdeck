@@ -67,6 +67,65 @@ def pace(lim: Limit | None, now: datetime) -> float | None:
     return (1 - lim.remaining - elapsed) * 100
 
 
+@dataclass
+class Forecast:
+    """지금 속도를 그대로 이어 간다고 볼 때의 경고."""
+
+    kind: str  # "fast" = 리셋 전에 바닥남, "waste" = 리셋 때 많이 남아 사라짐
+    hours: float | None = None  # fast: 바닥까지 남은 시간
+    leftover: float | None = None  # waste: 리셋 때 남을 비율 (0~1)
+
+
+FAST_MARGIN = 0.9  # 바닥 예상 시각이 리셋보다 10% 이상 이를 때만 (리셋 직전 소진은 정상)
+WASTE_NEAR = 0.35  # 창의 마지막 35% 구간에 들어왔을 때만 "다 못 씀" 판단
+WASTE_MIN = 0.3  # 리셋 때 30% 이상 남을 것 같을 때만
+
+
+def forecast(lim: Limit | None, now: datetime, waste: bool = False) -> Forecast | None:
+    """너무 빨리 쓰는 중이면 fast, (waste=True 이고) 리셋까지 다 못 쓸 것 같으면 waste, 아니면 None.
+
+    지금까지의 평균 속도를 남은 시간에도 그대로 쓴다고 가정한다. 창 시작 직후(10% 이전)나
+    거의 안 쓴 상태(5% 미만)는 속도를 믿기 어려워 "fast" 판단을 하지 않는다.
+    """
+    if not lim or lim.remaining is None or not lim.reset:
+        return None
+    total = lim.window.total_seconds()
+    left = (lim.reset - now).total_seconds()
+    if left <= 0 or left > total:
+        return None
+    elapsed, used = total - left, 1 - lim.remaining
+    rate = used / elapsed if elapsed > 0 else 0.0  # 초당 쓰는 비율
+    if elapsed >= 0.1 * total and used >= 0.05 and rate > 0:
+        empty_in = lim.remaining / rate
+        if empty_in < left * FAST_MARGIN:
+            return Forecast("fast", hours=empty_in / 3600)
+    if waste and left <= WASTE_NEAR * total:
+        leftover = lim.remaining - rate * left
+        if leftover >= WASTE_MIN:
+            return Forecast("waste", leftover=leftover)
+    return None
+
+
+def forecast_text(f: Forecast) -> str:
+    if f.kind == "fast":
+        h = f.hours or 0
+        return f"{max(1, round(h))}시간 뒤 바닥" if h < 48 else f"{round(h / 24)}일 뒤 바닥"
+    return f"리셋 때 ~{round((f.leftover or 0) * 100)}% 남음"
+
+
+def warn_color(f: Forecast | None) -> str | None:
+    return None if f is None else (RED if f.kind == "fast" else YELLOW)
+
+
+def llm_forecast(m: "LLM", now: datetime) -> Forecast | None:
+    """칸 하나에 띄울 가장 급한 경고: 바닥 예상(5H·주간) > 주간 다 못 씀."""
+    fs = [forecast(m.five, now), forecast(m.week, now, waste=True)]
+    fast = [f for f in fs if f and f.kind == "fast"]
+    if fast:
+        return min(fast, key=lambda f: f.hours or 0)
+    return next((f for f in fs if f), None)
+
+
 def pct(x: float | None) -> str:
     return "-" if x is None else f"{x * 100:.0f}%"
 
@@ -92,10 +151,11 @@ def login_tile(header: str) -> Button:
     return Button(header=header, title="로그인", sub="길게: 로그인", bg=BG, accent=YELLOW, border=YELLOW)
 
 
-def llm_tile(m: LLM) -> Button:
+def llm_tile(m: LLM, now: datetime | None = None) -> Button:
     if m.login:
         return login_tile(m.name)
     b = m.binding()
+    warn = warn_color(llm_forecast(m, now)) if now else None
     return Button(
         header=m.name,
         title=pct(b.remaining if b else None),
@@ -105,7 +165,7 @@ def llm_tile(m: LLM) -> Button:
             ("5H", m.five.remaining if m.five else None, color_for(m.five.remaining if m.five else None)),
             ("주간", m.week.remaining if m.week else None, color_for(m.week.remaining if m.week else None)),
         ],
-        border=RED if b and b.remaining is not None and b.remaining < 0.15 else None,
+        border=RED if b and b.remaining is not None and b.remaining < 0.15 else warn,
         sub=f"리셋 {until(b.reset)}" if b else "",
     )
 
@@ -113,7 +173,7 @@ def llm_tile(m: LLM) -> Button:
 def page_summary(llms: list[LLM], studio: StudioState, now: datetime, blink_on: bool = False) -> dict[int, Button]:
     p: dict[int, Button] = {i: Button(bg=BG) for i in (0, 1, 2, 5, 6, 7)}  # 안 쓰는 LLM 자리는 빈 칸
     for i, m in enumerate(llms[:3]):
-        p[i] = llm_tile(m)
+        p[i] = llm_tile(m, now)
     # 추천: 가장 여유 있는 LLM
     ranked = sorted((m for m in llms if m.binding()), key=lambda m: m.binding().remaining, reverse=True)
     if ranked:
@@ -133,8 +193,11 @@ def page_summary(llms: list[LLM], studio: StudioState, now: datetime, blink_on: 
         p[4] = Button(bg=BG)
     # 2줄: 주간 페이스 3칸 + 스튜디오 2칸
     for i, m in enumerate(llms[:3]):
-        pc = pace(m.week, now)
-        if pc is None:
+        pc, fc = pace(m.week, now), forecast(m.week, now, waste=True)
+        if fc:  # 경고: 지금 속도면 리셋 전에 바닥 / 리셋 때 많이 남음
+            p[5 + i] = Button(header=f"{m.name.split()[0]} 페이스", title="바닥 예상" if fc.kind == "fast" else "남음 예상",
+                              sub=forecast_text(fc), bg=BG, accent=warn_color(fc), border=warn_color(fc))
+        elif pc is None:
             p[5 + i] = Button(header=f"{m.name.split()[0]} 페이스", title="-", sub="정보 없음", bg=BG, accent=m.color)
         else:
             tag = "과속" if pc > 10 else ("여유" if pc < -10 else "적정")
@@ -195,9 +258,10 @@ def page_grid(llms: list[LLM], now: datetime, credits: list[tuple[str, str, dict
             elif lim is None or lim.remaining is None:
                 p[idx] = Button(header=f"{m.name.split()[0]} {label}", title="-", sub="없음", bg=BG, accent=m.color)
             else:
+                fc = forecast(lim, now, waste=attr == "week")  # 5H 는 금방 리셋되니 "다 못 씀"은 안 봄
                 p[idx] = Button(header=f"{m.name.split()[0]} {label}", title=pct(lim.remaining),
-                                sub=f"리셋 {until(lim.reset, now)}", bg=BG, accent=m.color,
-                                ratio=lim.remaining)
+                                sub=forecast_text(fc) if fc else f"리셋 {until(lim.reset, now)}", bg=BG,
+                                accent=m.color, ratio=lim.remaining, border=warn_color(fc))
                 p[idx].accent = m.color
     return p
 

@@ -50,6 +50,9 @@ PATTERNS: list[tuple[str, str]] = [
     (r"캐시 정리 가능 ([\d.]+[GT]B)", r"\1 reclaimable"),
     (r"정리 가능 ([\d.]+[GT]B)", r"\1 reclaimable"),
     (r"(\d+)초마다", r"every \1s"),
+    (r"(\d+)시간 뒤 바닥", r"empty in \1h"),
+    (r"(\d+)일 뒤 바닥", r"empty in \1d"),
+    (r"리셋 때 ~(\d+)% 남음", r"~\1% left at reset"),
     (r"(\d+)초 안에 길게 한 번 더", r"Hold again within \1s"),
     (r"(\d+)개 변경 반영", r"\1 changes applied"),
     (r"(\d+)번 · (\d+)번 코 차이 접전!", r"#\1 · #\2 neck and neck!"),
@@ -202,7 +205,7 @@ WORDS: list[tuple[str, str]] = sorted([
     ("비우기", "Empty"), ("정리?", "Purge?"), ("정리", "Purge"), ("삭제?", "Remove?"),
     ("메모리", "Memory"), ("디스크", "Disk"), ("건강", "Health"), ("실행", "run"), ("하위", "sub"),
     ("결정", "Decide"), ("완료", "Done"), ("작업", "Working"), ("대기", "Idle"), ("방치", "Stale"),
-    ("오래됨", "Old"), ("정상", "OK"), ("변경", "changes"), ("앞섬", "ahead"), ("과속", "Too fast"),
+    ("오래됨", "Old"), ("정상", "OK"), ("변경", "changes"), ("앞섬", "ahead"), ("과속", "Too fast"), ("바닥 예상", "Runs out"), ("남음 예상", "Unused"),
     ("적정", "On track"), ("여유", "Ahead"), ("추천", "Best"), ("확인", "check"), ("취소", "Cancel"),
     ("마다", " each"), ("초", "s"), ("없음", "none"), ("타이머", "Timer"), ("종료", "end"),
 ], key=lambda kv: -len(kv[0]))
