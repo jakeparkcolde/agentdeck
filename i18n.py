@@ -197,7 +197,7 @@ WORDS: list[tuple[str, str]] = sorted([
     ("길게 2번: 정리 가능 → 삭제", "Hold twice: mergeable → remove"),
     ("길게 2번: 그 외 → 총괄에 정리 요청", "Hold twice: others → ask lead"), ("누르기 2번: 정리 가능 → 삭제", "Press twice: mergeable → remove"),
     ("누르기 2번: 그 외 → 총괄에 정리 요청", "Press twice: others → ask lead"), ("길게: Herdr 에서 열기", "Hold: open in Herdr"),
-    ("한 번 더 누르면 실행", "Press again to run"),
+    ("한 번 더 누르면 실행", "Press again to run"), ("정리 요청함", "Cleanup requested"),
     ("길게 2번: 비우기", "Hold twice: empty"), ("길게 2번: 정리", "Hold twice: purge"),
     ("지울 산출물이 없어요", "nothing to remove"), ("비움 완료", "Emptied"),
     ("정리 가능 상태가 아님", "not ready to remove"), ("업데이트 실패", "Update failed"), ("fetch 실패", "fetch failed"),

@@ -217,7 +217,7 @@ If you manage agents with [Herdr](https://herdr.dev), this mode gives you more:
 
 - **Press once to arm (red), then press again within 10 seconds to run.** This prevents accidental deletes.
 - **Hold** to open the worktree in Herdr.
-- To enable, set `studio.host` (where the worktrees live) and `studio.worktree_globs` (where to look). Cleanup requests go to `studio.lead_pane`, which currently needs Herdr.
+- To enable, set `studio.host` (where the worktrees live) and `studio.worktree_globs` (where to look). Cleanup requests go to a live session, in order: an agent running in that repo's folder → `studio.cleanup_lead` (by name, default `worktree-lead-claude`) → `studio.lead_pane`. If every session is closed, a new Claude Code session is started in that repo to handle it. This currently needs Herdr.
 
 ### 4.4 Machines and device detail (page 4)
 

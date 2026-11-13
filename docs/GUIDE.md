@@ -217,7 +217,7 @@ python3 scripts/install-hooks.py --codex   # Codex도 함께 (기존 notify 설�
 
 - **누르면 빨간 확인 대기 상태가 되고, 10초 안에 한 번 더 눌러야 실행돼요.** 실수로 지워지지 않게 하려는 거예요.
 - **길게 누르면** 그 워크트리를 Herdr 에서 열어요.
-- 켜는 방법: `studio.host`(워크트리가 있는 컴퓨터)와 `studio.worktree_globs`(찾을 경로)를 설정하세요. 정리 요청은 `studio.lead_pane`으로 가는데, 이 기능은 지금 Herdr가 필요해요.
+- 켜는 방법: `studio.host`(워크트리가 있는 컴퓨터)와 `studio.worktree_globs`(찾을 경로)를 설정하세요. 정리 요청은 그 저장소 폴더에서 떠 있는 에이전트 → `studio.cleanup_lead`(이름, 기본 `worktree-lead-claude`) → `studio.lead_pane` 순서로 살아 있는 세션에 가요. 모두 닫혀 있으면 그 저장소에서 새 Claude Code 세션을 띄워 맡겨요. 이 기능은 지금 Herdr가 필요해요.
 
 ### 4.4 머신과 기기 상세 (4페이지)
 

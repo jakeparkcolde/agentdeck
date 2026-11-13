@@ -623,8 +623,9 @@ class Dashboard:
 
         def run() -> None:
             ok, out = remove_worktree(w) if armed_action == "remove" else ask_tower(w)
-            done = "삭제 완료" if armed_action == "remove" else "총괄에게 전송함"
-            self.toast(done if ok else "실패", [f"{w.repo}/{w.name}", out[:40]] if not ok else [f"{w.repo}/{w.name}"],
+            done = "삭제 완료" if armed_action == "remove" else "정리 요청함"
+            self.toast(done if ok else "실패", [f"{w.repo}/{w.name}", out[:40]] if (not ok or armed_action != "remove")
+                       else [f"{w.repo}/{w.name}"],
                        "#9ece6a" if ok else "#f7768e")
             self.refresh_worktrees()
 
