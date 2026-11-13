@@ -531,7 +531,7 @@ def page_device(m: MachineStat, ms, dry: dict, trash, armed: str | None) -> dict
                           accent=RED if alert else "#7aa2f7", border=RED if alert else None)
     # 실행 버튼 (길게 두 번)
     if armed == "clean":
-        p[7] = Button(header="캐시·로그", title="정리?", sub="한 번 더 누르면 실행", bg=RED, fg="#16161e", header_fg="#16161e")
+        p[7] = Button(header="캐시·로그", title="정리?", sub="길게 한 번 더", bg=RED, fg="#16161e", header_fg="#16161e")
     else:
         if clean is not None:
             csub = fmt_gb(clean)
@@ -539,7 +539,7 @@ def page_device(m: MachineStat, ms, dry: dict, trash, armed: str | None) -> dict
             csub = "측정 중…" if dry.get("measuring") else "길게 2번: 정리"
         p[7] = Button(header="캐시·로그", title="정리", sub=csub, bg="#1f2233", accent="#ff9e64", border="#ff9e64")
     if armed == "purge":
-        p[8] = Button(header="빌드 산출물", title="정리?", sub="한 번 더 누르면 실행", bg=RED, fg="#16161e", header_fg="#16161e")
+        p[8] = Button(header="빌드 산출물", title="정리?", sub="길게 한 번 더", bg=RED, fg="#16161e", header_fg="#16161e")
     else:
         if dry.get("purge_gb") is not None:
             sub = f"{fmt_gb(dry['purge_gb'])} · {dry.get('purge_items', 0)}개"
@@ -547,7 +547,7 @@ def page_device(m: MachineStat, ms, dry: dict, trash, armed: str | None) -> dict
             sub = "측정 중…" if dry.get("measuring") else "길게 2번: 정리"
         p[8] = Button(header="빌드 산출물", title="정리", sub=sub, bg="#1f2233", accent="#ff9e64", border="#ff9e64")
     if armed == "trash":
-        p[9] = Button(header="휴지통", title="비우기?", sub="한 번 더 누르면 실행", bg=RED, fg="#16161e", header_fg="#16161e")
+        p[9] = Button(header="휴지통", title="비우기?", sub="길게 한 번 더", bg=RED, fg="#16161e", header_fg="#16161e")
     else:
         tsub = (f"{fmt_gb(trash[1])} · {trash[0]}개" if trash[0] >= 0 else fmt_gb(trash[1])) if trash else "길게 2번: 비우기"
         p[9] = Button(header="휴지통", title="비우기", sub=tsub, bg="#1f2233", accent="#ff9e64", border="#ff9e64")
