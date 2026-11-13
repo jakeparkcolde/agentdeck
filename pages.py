@@ -117,6 +117,17 @@ def warn_color(f: Forecast | None) -> str | None:
     return None if f is None else (RED if f.kind == "fast" else YELLOW)
 
 
+WARN_TINT = {RED: "#4a1d26", YELLOW: "#4a3b14"}  # 막대가 있는 칸용 어두운 바탕 (막대·글자가 보이게)
+
+
+def warn_fill(b: Button, f: Forecast | None) -> Button:
+    """경고 칸을 눈에 띄게: 칸 전체를 경고 색으로 칠하고 글자는 어둡게 (테두리만으로는 잘 안 보임)."""
+    col = warn_color(f)
+    if col:
+        b.bg, b.fg, b.accent, b.header_fg, b.border = col, "#16161e", "#16161e", "#16161e", None
+    return b
+
+
 def llm_forecast(m: "LLM", now: datetime) -> Forecast | None:
     """칸 하나에 띄울 가장 급한 경고: 바닥 예상(5H·주간) > 주간 다 못 씀."""
     fs = [forecast(m.five, now), forecast(m.week, now, waste=True)]
@@ -167,6 +178,13 @@ def llm_tile(m: LLM, now: datetime | None = None) -> Button:
         ],
         border=RED if b and b.remaining is not None and b.remaining < 0.15 else warn,
         sub=f"리셋 {until(b.reset)}" if b else "",
+    ) if not warn else Button(  # 경고: 어두운 경고색 바탕 + 경고색 테두리 (막대는 그대로 보이게)
+        header=m.name, title=pct(b.remaining if b else None), bg=WARN_TINT[warn], accent=warn,
+        bars=[
+            ("5H", m.five.remaining if m.five else None, color_for(m.five.remaining if m.five else None)),
+            ("주간", m.week.remaining if m.week else None, color_for(m.week.remaining if m.week else None)),
+        ],
+        border=warn, sub=f"리셋 {until(b.reset)}" if b else "",
     )
 
 
@@ -195,8 +213,8 @@ def page_summary(llms: list[LLM], studio: StudioState, now: datetime, blink_on: 
     for i, m in enumerate(llms[:3]):
         pc, fc = pace(m.week, now), forecast(m.week, now, waste=True)
         if fc:  # 경고: 지금 속도면 리셋 전에 바닥 / 리셋 때 많이 남음
-            p[5 + i] = Button(header=f"{m.name.split()[0]} 페이스", title="바닥 예상" if fc.kind == "fast" else "남음 예상",
-                              sub=forecast_text(fc), bg=BG, accent=warn_color(fc), border=warn_color(fc))
+            p[5 + i] = warn_fill(Button(header=f"{m.name.split()[0]} 페이스",
+                                        title="바닥 예상" if fc.kind == "fast" else "남음 예상", sub=forecast_text(fc)), fc)
         elif pc is None:
             p[5 + i] = Button(header=f"{m.name.split()[0]} 페이스", title="-", sub="정보 없음", bg=BG, accent=m.color)
         else:
@@ -259,9 +277,9 @@ def page_grid(llms: list[LLM], now: datetime, credits: list[tuple[str, str, dict
                 p[idx] = Button(header=f"{m.name.split()[0]} {label}", title="-", sub="없음", bg=BG, accent=m.color)
             else:
                 fc = forecast(lim, now, waste=attr == "week")  # 5H 는 금방 리셋되니 "다 못 씀"은 안 봄
-                p[idx] = Button(header=f"{m.name.split()[0]} {label}", title=pct(lim.remaining),
-                                sub=forecast_text(fc) if fc else f"리셋 {until(lim.reset, now)}", bg=BG,
-                                accent=m.color, ratio=lim.remaining, border=warn_color(fc))
+                p[idx] = warn_fill(Button(header=f"{m.name.split()[0]} {label}", title=pct(lim.remaining),
+                                          sub=forecast_text(fc) if fc else f"리셋 {until(lim.reset, now)}", bg=BG,
+                                          accent=m.color, ratio=lim.remaining), fc)
                 p[idx].accent = m.color
     return p
 

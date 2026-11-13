@@ -60,12 +60,12 @@ class ForecastTest(unittest.TestCase):
         calm = LLM("CLAUDE", "#d97757", week=lim(0.5, days_left=3.5))
         p = pages.page_summary([calm, fast, waste], pages.StudioState(False, []), NOW)
         self.assertEqual((p[5].title, p[6].title, p[7].title)[1:], ("바닥 예상", "남음 예상"))
-        self.assertEqual((p[6].border, p[7].border), (pages.RED, pages.YELLOW))
+        self.assertEqual((p[6].bg, p[7].bg), (pages.RED, pages.YELLOW))  # 칸 전체를 경고색으로
         self.assertEqual((p[1].border, p[2].border, p[0].border), (pages.RED, pages.YELLOW, None))
         g = pages.page_grid([calm, fast, waste], NOW)
         self.assertEqual(g[6].sub, "32시간 뒤 바닥")
         self.assertEqual(g[7].sub, "리셋 때 ~50% 남음")
-        self.assertIsNone(g[5].border)
+        self.assertEqual((g[6].bg, g[7].bg, g[5].bg), (pages.RED, pages.YELLOW, pages.BG))
 
     def test_english(self):
         import i18n
