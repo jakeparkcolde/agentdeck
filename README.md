@@ -185,7 +185,7 @@ flowchart LR
 
 > ⚠️ Codex 한도 조회는 **공식 문서가 없는 내부 API**를 씁니다. 언제든 바뀌거나 막힐 수 있으니, 각 서비스 약관을 확인하고 본인 책임 아래 사용하세요.
 
-agy는 SSH로 공식 CLI의 읽기 전용 명령 `agy -p /usage --output-format json`을 실행해요(CLI 1.1.11 이상). 자세한 조건은 [Antigravity 한도 안내](docs/ANTIGRAVITY.md)를 보세요.
+agy는 SSH로 공식 CLI의 읽기 전용 명령 `agy -p /usage --output-format json`을 실행해요(CLI 1.1.11 이상). 로그인이 자꾸 풀리면 agy 컴퓨터에 수집기를 한 번 설치하세요: `.venv/bin/python remote_agy.py --install`. 자세한 조건은 [Antigravity 한도 안내](docs/ANTIGRAVITY.md)를 보세요.
 
 ## 🗺 로드맵
 

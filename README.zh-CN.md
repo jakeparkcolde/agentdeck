@@ -185,7 +185,7 @@ flowchart LR
 
 > ⚠️ Codex 额度查询使用的是 **未公开的内部接口**，随时可能变更或失效。请查阅该服务的条款，风险自负。
 
-agy 通过 SSH 运行官方只读 CLI 命令 `agy -p /usage --output-format json`（CLI 1.1.11+）。相关要求请见 [Antigravity 额度](docs/ANTIGRAVITY.md)。
+agy 通过 SSH 运行官方只读 CLI 命令 `agy -p /usage --output-format json`（CLI 1.1.11+）。如果登录经常失效，请在运行 agy 的电脑上安装一次采集任务：`.venv/bin/python remote_agy.py --install`。相关要求请见 [Antigravity 额度](docs/ANTIGRAVITY.md)。
 
 ## 🗺 路线图
 

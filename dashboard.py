@@ -249,8 +249,11 @@ class Dashboard:
             self.render()
         elif self.page in (1, 2) and held >= LONG_PRESS and self.login_llm(ev.index):
             # 로그인이 풀린 LLM 칸 길게: 터미널을 열어 사용자가 직접 로그인
-            ok = remote_agy.open_login()
-            self.toast("AGY", ["터미널에서 로그인", "끝나면 agy 종료"] if ok else ["터미널을 못 열었어요"], "#7aa2f7", 6)
+            if remote_agy.via_collector:  # 수집기는 그 컴퓨터의 평소 로그인을 쓴다: SSH 로그인으로는 안 풀림
+                self.toast("AGY", ["agy 컴퓨터에서", "agy 로그인"], "#7aa2f7", 6)
+            else:
+                ok = remote_agy.open_login()
+                self.toast("AGY", ["터미널에서 로그인", "끝나면 agy 종료"] if ok else ["터미널을 못 열었어요"], "#7aa2f7", 6)
         elif ev.index == 10:
             self.page = PAGES if self.page in (HOME_PAGE, 1) else self.page - 1
             if self.page == AQUA_PAGE:

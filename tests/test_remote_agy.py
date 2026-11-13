@@ -195,5 +195,80 @@ class LoginStateTest(unittest.TestCase):
             self.assertIn("ssh -t 'me@host; rm -rf x' ", agy.login_command())
 
 
+
+class CollectorTests(unittest.TestCase):
+    """수집기: agy 컴퓨터가 5분마다 써 두는 파일을 덱이 읽는다 (SSH 로그인이 풀리는 문제를 피함)."""
+
+    def cache(self, code=0, payload=FIXTURE, age=60):
+        import time
+        return json.dumps({"checked": time.time() - age, "code": code, "payload": payload})
+
+    def test_read_cache_states(self):
+        import time
+        now = time.time()
+        self.assertEqual(agy.read_cache(self.cache(), now)[0], "ok")
+        self.assertEqual(len(agy.read_cache(self.cache(), now)[1]), 3)
+        self.assertEqual(agy.read_cache(self.cache(code=agy.LOGIN_EXIT, payload=None), now), ("login", None))
+        self.assertEqual(agy.read_cache(self.cache(code=1, payload=None), now), ("error", None))
+        self.assertEqual(agy.read_cache(self.cache(age=agy.FRESH_SEC + 60), now), ("stale", None))  # 수집기가 멈춤
+        for bad in ["", "not json", "{}", '{"checked": "x", "code": 0}', json.dumps(FIXTURE)]:
+            self.assertEqual(agy.read_cache(bad, now), ("stale", None), bad)
+
+    @patch.object(agy, "HOST", "synthetic-host")
+    @patch.object(agy.subprocess, "run")
+    def test_fresh_cache_skips_running_agy(self, run):
+        run.return_value = subprocess.CompletedProcess([], 0, self.cache())
+        self.assertEqual(len(agy.agy_quota()), 3)
+        self.assertEqual(run.call_count, 1)  # agy 를 SSH 로 직접 돌리지 않음
+        self.assertIn("cat ~/.cache/agentdeck/agy_usage.json", run.call_args[0][0][-1])
+        self.assertTrue(agy.via_collector)
+
+    @patch.object(agy, "HOST", "synthetic-host")
+    @patch.object(agy.subprocess, "run")
+    def test_collector_login_state(self, run):
+        run.return_value = subprocess.CompletedProcess([], 0, self.cache(code=agy.LOGIN_EXIT, payload=None))
+        self.assertIsNone(agy.agy_quota())
+        self.assertTrue(agy.login_needed and agy.via_collector)
+
+    @patch.object(agy, "HOST", "synthetic-host")
+    @patch.object(agy.subprocess, "run")
+    def test_stale_or_missing_cache_falls_back(self, run):
+        run.side_effect = [subprocess.CompletedProcess([], 1, "", "No such file"),
+                           subprocess.CompletedProcess([], 0, json.dumps(FIXTURE))]
+        self.assertEqual(len(agy.agy_quota()), 3)
+        self.assertEqual(run.call_args[1]["input"], agy.REMOTE)
+        self.assertFalse(agy.via_collector)
+
+    def test_collector_script_writes_cache(self):
+        import os
+        import sys
+        import tempfile
+        payload = json.dumps(FIXTURE)
+        with tempfile.TemporaryDirectory() as home:
+            bindir = os.path.join(home, ".local", "bin")
+            os.makedirs(bindir)
+            with open(os.path.join(bindir, "agy"), "w") as f:
+                f.write(f'''#!/bin/sh
+if [ "$1" = "--version" ]; then printf '1.5.7'; exit 0; fi
+cat <<'JSON'
+{payload}
+JSON
+''')
+            os.chmod(os.path.join(bindir, "agy"), 0o755)
+            script = os.path.join(home, "c.py")
+            with open(script, "w") as f:
+                f.write(agy.collector_script())
+            r = subprocess.run([sys.executable, script], capture_output=True, text=True, timeout=60,
+                               env=dict(os.environ, HOME=home))
+            self.assertEqual(r.returncode, 0, r.stderr)
+            with open(os.path.join(home, ".cache", "agentdeck", "agy_usage.json")) as f:
+                text = f.read()
+        import time
+        self.assertEqual(agy.read_cache(text, time.time())[0], "ok")
+
+    def test_install_script_is_valid_python(self):
+        compile(agy.INSTALL, "install", "exec")
+
+
 if __name__ == "__main__":
     unittest.main()

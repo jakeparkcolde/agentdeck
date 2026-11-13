@@ -185,7 +185,7 @@ flowchart LR
 
 > ⚠️ Codex の取得には**非公開の内部エンドポイント**を使っています。いつ変更・停止されてもおかしくありません。サービスの利用規約を確認のうえ、自己責任でご利用ください。
 
-agy は公式の読み取り専用 CLI コマンド `agy -p /usage --output-format json` を SSH 経由で実行します（CLI 1.1.11+）。要件は [Antigravity の使用枠](docs/ANTIGRAVITY.md) をご覧ください。
+agy は公式の読み取り専用 CLI コマンド `agy -p /usage --output-format json` を SSH 経由で実行します（CLI 1.1.11+）。ログインが頻繁に切れる場合は、agy のコンピューターに収集ジョブを一度インストールしてください: `.venv/bin/python remote_agy.py --install`。要件は [Antigravity の使用枠](docs/ANTIGRAVITY.md) をご覧ください。
 
 ## 🗺 ロードマップ
 

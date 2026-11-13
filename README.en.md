@@ -185,7 +185,7 @@ flowchart LR
 
 > ⚠️ The Codex lookup uses **undocumented internal endpoints**. They may change or stop working at any time. Check the service's terms and use it at your own risk.
 
-agy runs the official read-only CLI command `agy -p /usage --output-format json` over SSH (CLI 1.1.11+). See [Antigravity quota](docs/ANTIGRAVITY.md) for requirements.
+agy runs the official read-only CLI command `agy -p /usage --output-format json` over SSH (CLI 1.1.11+). If the login keeps expiring, install the collector on the agy computer once: `.venv/bin/python remote_agy.py --install`. See [Antigravity quota](docs/ANTIGRAVITY.md) for requirements.
 
 ## 🗺 Roadmap
 
