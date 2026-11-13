@@ -99,6 +99,8 @@ git worktree を **停滞・マージ可能・古い・アクティブ** に分�
 ### 5 · ポモドーロ
 10個のセルが**最後のセルから順に**減っていきます。時間になると点滅し、macOS の通知を送ります。
 
+**プレゼンモード**（ホーム → 発表）：スライド ◀ ▶（Keynote・PowerPoint・PDF・Google スライド）、目標時間タイマー（残り5分で黄、超過で赤）、画面ブラックアウト、講義録音 → [agentnote](https://github.com/jakeparkcolde/agentnote) で講義ノート、★重要・Q質問の時点マーク、デモのショートカット（`config.json` の `presentation.demos`）。初回はアクセシビリティとマイクの許可を求められます。
+
 <sub>→ [ガイド：ポモドーロ](docs/GUIDE.en.md#45-pomodoro-page-5)</sub>
 
 </td>

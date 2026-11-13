@@ -30,6 +30,7 @@ import parcels
 import parcels_import
 import web_credits
 import updater
+import present
 import intro
 from sfx import ambient, play
 from fireplace import Fireplace
@@ -62,6 +63,7 @@ AQUA_PAGE = PAGES  # 어항 (넘김 순서 마지막, 화면보호기로도 사�
 GAME_TICK = 0.05
 AQUA_FPS = 5
 WT_PAGE = 16  # 워크트리: 작업 현황 넓은 칸에서 들어가는 하위 페이지 (넘김 순서 밖)
+PRES_PAGE = 18  # 발표 모드: 홈 바로가기로 들어가는 하위 페이지 (넘김 순서 밖)
 DEV_PAGE = 17  # 기기 상세: 머신 페이지에서 컴퓨터를 눌러 들어가는 하위 페이지
 WT_POLL_SEC = 60
 ARM_SEC = 10  # 길게 한 번 누른 뒤 확인 대기 시간
@@ -163,6 +165,9 @@ class Dashboard:
         self.home_fresh = False
         self.home_note_page = 0
         self.home_extra: list[tuple[int, str, str, str, str]] = []
+        self.home_more = False  # 홈 바로가기가 10개를 넘으면 둘째 화면
+        self.pres = present.Presenter()
+        self.pres_app = ""  # 발표 화면에 보여줄 맨 앞 앱 이름
         self.home_pick = False  # 홈에서 어항을 눌렀을 때: 물멍/불멍 고르기  # 선택 기능이 홈에 추가하는 바로가기
         self.parcels: list = []  # 택배 목록 (parcels.Parcel)
         self.parcels_at = 0.0
@@ -247,6 +252,12 @@ class Dashboard:
         elif self.page == WT_PAGE and ev.index in (10, 12):  # 워크트리 → 뒤로(작업 현황) / 다음(머신)
             self.page = 3 if ev.index == 10 else 4
             self.render()
+        elif self.page == PRES_PAGE and ev.index in (10, 12):  # 발표 화면 ◀ ▶ = 홈으로 (발표는 계속)
+            self.go_page(HOME_PAGE)
+        elif self.page == PRES_PAGE and (ev.index < 10 or ev.index >= 13):
+            present.press(self.pres, ev.index, held, LONG_PRESS, on_uploaded=lambda ok, text: self.render())
+            self.pres_app = present.front_app() if ev.index in (0, 1, 2) else self.pres_app
+            self.render()
         elif self.page in (1, 2) and held >= LONG_PRESS and self.login_llm(ev.index):
             # 로그인이 풀린 LLM 칸 길게: 터미널을 열어 사용자가 직접 로그인
             if remote_agy.via_collector:  # 수집기는 그 컴퓨터의 평소 로그인을 쓴다: SSH 로그인으로는 안 풀림
@@ -294,7 +305,10 @@ class Dashboard:
                     self.render()
             elif ev.index < len(items):
                 pg = items[ev.index][0]
-                if pg == AQUA_PAGE:
+                if pg < 0:  # 더보기 / 처음으로
+                    self.home_more = pg == -1
+                    self.render()
+                elif pg == AQUA_PAGE:
                     self.home_pick = True
                     self.render()
                 else:
@@ -363,7 +377,12 @@ class Dashboard:
         if PARCELS_ON:
             items.append((PARCEL_PAGE, "택배", "도착 예상", "parcel", "#ff9e64"))
         items.append((AQUA_PAGE, "어항", "물멍 · 불멍 · 비 · 바다", "fish", "#7dcfff"))
-        return (items + self.home_extra)[:10]
+        items.append((PRES_PAGE, "발표", "슬라이드 · 타이머 · 녹음", "bell", "#e0af68"))
+        items += self.home_extra
+        if len(items) <= 10:
+            return items
+        more, back = (-1, "더보기", "다음 바로가기", "sparkle", "#565f89"), (-2, "처음으로", "첫 바로가기", "home", "#565f89")
+        return items[9:] + [back] if self.home_more else items[:9] + [more]
 
     def render_home(self) -> None:
         if self.home_pick:  # 물멍 / 불멍 고르기: 세로 두 칸짜리 큰 단추 두 개
@@ -816,6 +835,15 @@ class Dashboard:
         if self.page == GAME_PAGE:
             self.render_game()
             return
+        if self.page == PRES_PAGE:
+            with self.render_lock:
+                navs = nav(self.page, PAGES, self.brightness, ("발표", "◀ ▶ 홈으로"))
+                navs[11] = Button(header="발표", title="홈", sub="◀ ▶ 홈으로", bg="#24283b", accent="#565f89")
+                try:
+                    self.deck.set_buttons({**present.page(self.pres), **navs}, small_png=present.wide(self.pres, self.pres_app))
+                except Exception as e:
+                    print(f"{datetime.now():%H:%M:%S} present render error: {e}", flush=True)
+            return
         with self.render_lock:
             now = datetime.now(timezone.utc)
             if self.page == AQUA_PAGE:
@@ -954,6 +982,8 @@ class Dashboard:
                     self.page, dirty = 5, True
                 if self.page == 5 and self.pomo.state == "running":
                     dirty = True  # 매초 남은 시간·칸 갱신
+                if self.page == PRES_PAGE and (self.pres.active() or self.pres.msg):
+                    dirty = True  # 발표 타이머·녹음 시간 매초 갱신
                 if (self.page == 5 and self.pomo.state == "done") or \
                         ((self.studio.attention or self.studio.done) and self.page in (1, 3)):
                     self.blink_on, dirty = not self.blink_on, True
@@ -967,7 +997,8 @@ class Dashboard:
                     continue
                 if self.page == GAME_PAGE and self.games.active:
                     continue  # 게임 중엔 화면보호기·주기 갱신 없음
-                if self.saver_sec and not alert and time.time() - self.last_input > self.saver_sec:
+                if self.saver_sec and not alert and not self.pres.active() \
+                        and time.time() - self.last_input > self.saver_sec:  # 발표 중엔 화면보호기 없음
                     self.enter_aquarium(saver=True)
                     continue
                 # 워크트리: 확인 대기·결과 메시지가 만료되면 원래 화면으로

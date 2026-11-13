@@ -43,6 +43,13 @@
     "enabled": false,
     "host": "studio-host"
   },
+  "presentation": {
+    "mic": null,
+    "save_dir": "~/Movies/agentdeck",
+    "demos": [
+      {"name": "Demo site", "open": "https://example.com"}
+    ]
+  },
   "market": {
     "enabled": true,
     "portfolio": [

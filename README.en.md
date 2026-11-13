@@ -99,6 +99,8 @@ CPU, memory, disk and external drives across Macs, with the [Mole](https://githu
 ### 5 · Pomodoro
 Ten cells drain **from the last one backwards**. Blinks and sends a macOS notification when time is up.
 
+**Presentation mode** (Home → Present): slide ◀ ▶ (Keynote, PowerPoint, PDF, Google Slides), target-time timer (yellow at 5 min left, red when over), blank screen, lecture recording → [agentnote](https://github.com/jakeparkcolde/agentnote) lecture notes, ★ key-point and Q question marks, demo shortcuts (`presentation.demos` in `config.json`). macOS asks for Accessibility and microphone permission on first use.
+
 <sub>→ [Guide: pomodoro](docs/GUIDE.en.md#45-pomodoro-page-5)</sub>
 
 </td>

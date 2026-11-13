@@ -99,6 +99,8 @@ git worktree 按 **已失效、可合并、较旧、活跃** 分组。长按两�
 ### 5 · 番茄钟
 十个格子 **从最后一格开始倒着** 消减。时间到时闪烁并发送 macOS 通知。
 
+**演示模式**（主页 → 演示）：幻灯片 ◀ ▶（Keynote、PowerPoint、PDF、Google 幻灯片）、目标时长计时器（剩 5 分钟变黄、超时变红）、黑屏、讲课录音 → [agentnote](https://github.com/jakeparkcolde/agentnote) 讲课笔记、★重点和 Q 提问时间标记、演示快捷方式（`config.json` 中的 `presentation.demos`）。首次使用时 macOS 会请求辅助功能和麦克风权限。
+
 <sub>→ [指南：番茄钟](docs/GUIDE.en.md#45-pomodoro-page-5)</sub>
 
 </td>
