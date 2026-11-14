@@ -7,9 +7,11 @@
 
 규칙 (짧게 끝나게)
 - 판은 32칸 (AI 회사 24곳 · 8개 업종). 화면은 움직이는 말 주변 8칸을 따라가고, 넓은 칸에 판 전체 작은 지도.
-- 출발을 지나면 투자금 +150. 빈 회사에 서면 살 수 있고, 내 회사에 다시 서면 서버를 증설(2단계까지).
+- 출발을 지나면 투자금 +150. 빈 회사에 서면 살 수 있고, 내 회사에 다시 서면 서버 증설(2단계) → 랜드마크 '유니콘 본사'(3단계).
 - 특수 칸: 깜짝 뉴스(카드) · 서버 장애(한 번 쉬기) · AI 학회(상금) · 클라우드 정산(돈 내기) · 해커톤(한 번 더).
 - 남의 회사에 서면 API 사용료를 낸다. 같은 업종 3곳을 다 가지면 사용료 2배.
+- 업종을 넘는 조합을 갖추면 시너지 (SYNERGIES): 사용료 +50%, 정산 면제, 상금 2배, 차례마다 지원금.
+- 깜짝 뉴스 중 보관 카드(행운 카드)는 갖고 있다가 쓴다: 사용료 면제 · 반값 인수 · 피벗(보이는 칸으로 이동) · 인수합병.
 - 돈이 모자라면 회사를 반값에 팔고, 그래도 모자라면 파산. 혼자 남거나 각자 24번 굴리면 자산이 많은 사람이 이긴다.
 """
 
@@ -51,6 +53,9 @@ GROUP_COLORS = [(139, 92, 246), (236, 72, 153), (59, 130, 246), (20, 184, 166), 
                 (249, 115, 22), (239, 68, 68)]
 ART = Path(__file__).parent / "assets" / "tycoon"  # agy(Antigravity) 로 만든 그림 256px WebP (없으면 이모지)
 BONUS, TAX = 100, 100
+MAX_LEVEL = 3  # 증설 1·2단계 + 3단계 랜드마크(유니콘 본사)
+LEVEL_MULT = (1, 3, 6, 9)  # 단계별 사용료 배수
+AGI_GRANT = 30  # AGI 레이스 시너지: 내 차례마다
 
 
 @dataclass(frozen=True)
@@ -115,8 +120,9 @@ class Card:
     desc: str
     emoji: str
     art: str
-    kind: str  # cash | each | per_company | goto_start | outage | forward
+    kind: str  # cash | each | per_company | goto_start | outage | forward | keep(보관)
     amount: int = 0
+    item: str = ""  # keep 카드: 보관함에 들어가는 행운 카드 (ITEMS)
 
 
 CARDS = [
@@ -129,18 +135,59 @@ CARDS = [
     Card(t("IPO 축하", "IPO day"), t(f"출발로 이동 +{PASS_BONUS}", f"Go to Start, +{PASS_BONUS}"), "🔔", "card_ipo", "goto_start"),
     Card(t("GPU 품귀", "GPU shortage"), t("서버 장애로 이동, 한 번 쉬기", "Go to Outage, skip a turn"), "🧯", "card_gpu", "outage"),
     Card(t("데모 데이 발표", "Demo day"), t("3칸 앞으로", "Move 3 forward"), "🎤", "card_demo", "forward", 3),
+    Card(t("오픈소스 스타 폭발", "Open-source star"), t("+80", "+80"), "⭐", "card_oss", "cash", 80),
+    Card(t("API 레이트 리밋", "Rate limited"), t("-80", "-80"), "⏳", "card_ratelimit", "cash", -80),
+    Card(t("보안 감사 통과", "Passed security audit"), t("보관: 사용료 1번 면제", "Keep: skip one fee"), "🛡️", "card_shield", "keep", item="shield"),
+    Card(t("시리즈 A 우대권", "Series A voucher"), t("보관: 다음 인수 반값", "Keep: next buy half price"), "🎟️", "card_coupon", "keep", item="coupon"),
+    Card(t("피벗 기회", "Pivot chance"), t("보관: 보이는 칸으로 이동", "Keep: jump to a shown cell"), "🔀", "card_pivot", "keep", item="pivot"),
+    Card(t("인수합병 제안서", "M&A offer"), t("보관: 남의 회사 1.5배에 인수", "Keep: buy a rival's company at 1.5x"), "🤝", "card_mna", "keep", item="mna"),
 ]
 
+# 보관 카드(행운 카드): 키 → (이모지, 짧은 이름)
+ITEMS = {"shield": ("🛡️", t("면제권", "Shield")), "coupon": ("🎟️", t("반값권", "Voucher")),
+         "pivot": ("🔀", t("피벗", "Pivot")), "mna": ("🤝", t("인수합병", "M&A"))}
 
-def rent(cell: Cell, level: int, monopoly: bool) -> int:
-    """API 사용료: 기본은 가격의 절반, 서버 증설 1단계 ×3, 2단계 ×6, 업종 독점이면 ×2."""
+
+@dataclass(frozen=True)
+class Synergy:
+    key: str
+    emoji: str
+    name: str
+    need: tuple  # 칸 그림 이름 묶음들. 묶음마다 하나 이상 가지면 됨
+    effect: str
+    groups: frozenset = frozenset()  # 사용료 +50% 가 붙는 업종 (없으면 사용료와 무관)
+
+
+SYNERGIES = [
+    Synergy("multimodal", "🎨", t("멀티모달", "Multimodal"), (("voice",), ("imagegen",), ("videogen",)),
+            t("생성 AI 사용료 +50%", "Gen-AI fees +50%"), frozenset({0, 1})),
+    Synergy("vertical", "☁️", t("수직 계열화", "Vertical stack"), (("aichip",), ("gpucloud",), ("datacenter",)),
+            t("클라우드 정산 면제", "No cloud bill")),
+    Synergy("mobility", "🚗", t("모빌리티 스택", "Mobility stack"), (("aichip",), ("selfdriving", "drone", "robotaxi"), ("edge",)),
+            t("모빌리티 사용료 +50%", "Mobility fees +50%"), frozenset({4})),
+    Synergy("health", "🩺", t("헬스케어 AI", "Healthcare AI"), (("medical",), ("drug",), ("tutor",)),
+            t("학회 상금 2배", "Summit prize x2")),
+    Synergy("agi", "✨", t("AGI 레이스", "AGI race"), (("agents",), ("aichip",), ("agi",)),
+            t(f"차례마다 +{AGI_GRANT}", f"+{AGI_GRANT} each turn")),
+]
+SYN = {s.key: s for s in SYNERGIES}
+
+
+def rent(cell: Cell, level: int, monopoly: bool, boost: float = 1.0) -> int:
+    """API 사용료: 기본은 가격의 절반, 증설 1단계 ×3, 2단계 ×6, 랜드마크 ×9, 업종 독점이면 ×2, 시너지면 ×1.5."""
     base = cell.price // 2
-    r = int(base * (1, 3, 6)[level])
+    r = int(base * LEVEL_MULT[level] * boost)
     return r * 2 if monopoly else r
 
 
-def upgrade_cost(cell: Cell) -> int:
-    return cell.price // 2
+def upgrade_cost(cell: Cell, level: int = 0) -> int:
+    """level 단계에서 한 단계 올리는 값: 증설은 가격의 절반, 랜드마크(2→3)는 가격만큼."""
+    return cell.price if level >= 2 else cell.price // 2
+
+
+def invested(cell: Cell, level: int) -> int:
+    """증설에 들인 돈 합계 (자산·매각 계산용)."""
+    return sum(upgrade_cost(cell, k) for k in range(level))
 
 
 @dataclass
@@ -152,6 +199,7 @@ class Player:
     pos: int = 0
     skip: bool = False
     out: bool = False
+    items: list = field(default_factory=list)  # 보관 카드 (ITEMS 키)
 
 
 @dataclass
@@ -164,6 +212,7 @@ class Game:
     turn: int = 0
     rounds: int = 0
     deck: list[int] = field(default_factory=list)
+    shielded: bool = False  # 마지막 사용료를 면제권으로 막았는지
 
     def __post_init__(self) -> None:
         if not self.players:
@@ -179,15 +228,24 @@ class Game:
         cells = [i for i, c in enumerate(CELLS) if c.group == group]
         return all(self.owner.get(i) == who for i in cells)
 
+    def synergies(self, who: int) -> list[str]:
+        """who 가 갖춘 시너지 키."""
+        arts = {CELLS[i].art for i, o in self.owner.items() if o == who}
+        return [s.key for s in SYNERGIES if all(any(a in arts for a in alts) for alts in s.need)]
+
     def rent_at(self, i: int) -> int:
         o = self.owner.get(i)
-        return 0 if o is None else rent(CELLS[i], self.level.get(i, 0), self.monopoly(o, CELLS[i].group))
+        if o is None:
+            return 0
+        c = CELLS[i]
+        boost = 1.5 if any(c.group in SYN[k].groups for k in self.synergies(o)) else 1.0
+        return rent(c, self.level.get(i, 0), self.monopoly(o, c.group), boost)
 
     def assets(self, who: int) -> int:
         v = self.players[who].cash
         for i, o in self.owner.items():
             if o == who:
-                v += CELLS[i].price + self.level.get(i, 0) * upgrade_cost(CELLS[i])
+                v += CELLS[i].price + invested(CELLS[i], self.level.get(i, 0))
         return v
 
     def alive(self) -> list[int]:
@@ -219,7 +277,9 @@ class Game:
         """돈 변화 [(플레이어, 금액)]. 이동 카드는 위치만 바꾼다 (도착 처리는 호출하는 쪽)."""
         me = self.turn
         out: list[tuple[int, int]] = []
-        if c.kind == "cash":
+        if c.kind == "keep":
+            self.cur.items.append(c.item)
+        elif c.kind == "cash":
             self.cur.cash += c.amount
             out.append((me, c.amount))
         elif c.kind == "each":
@@ -243,26 +303,59 @@ class Game:
             self.move_to((self.cur.pos + c.amount) % N)
         return out
 
+    def buy_price(self, i: int) -> int:
+        """반값권이 있으면 반값."""
+        return CELLS[i].price // 2 if "coupon" in self.cur.items else CELLS[i].price
+
     def buy(self, i: int) -> bool:
         c = CELLS[i]
-        if c.kind != "company" or i in self.owner or self.cur.cash < c.price:
+        price = self.buy_price(i)
+        if c.kind != "company" or i in self.owner or self.cur.cash < price:
             return False
-        self.cur.cash -= c.price
+        if price < c.price:
+            self.cur.items.remove("coupon")
+        self.cur.cash -= price
         self.owner[i] = self.turn
         self.level[i] = 0
         return True
 
     def upgrade(self, i: int) -> bool:
         c = CELLS[i]
-        if self.owner.get(i) != self.turn or self.level.get(i, 0) >= 2 or self.cur.cash < upgrade_cost(c):
+        lv = self.level.get(i, 0)
+        if self.owner.get(i) != self.turn or lv >= MAX_LEVEL or self.cur.cash < upgrade_cost(c, lv):
             return False
-        self.cur.cash -= upgrade_cost(c)
-        self.level[i] = self.level.get(i, 0) + 1
+        self.cur.cash -= upgrade_cost(c, lv)
+        self.level[i] = lv + 1
+        return True
+
+    def takeover_cost(self, i: int) -> int:
+        c = CELLS[i]
+        return (c.price + invested(c, self.level.get(i, 0))) * 3 // 2
+
+    def can_takeover(self, i: int) -> bool:
+        """인수합병 제안서: 남의 회사(랜드마크 제외)를 1.5배 값에 사 온다."""
+        o = self.owner.get(i)
+        return ("mna" in self.cur.items and o is not None and o != self.turn
+                and self.level.get(i, 0) < MAX_LEVEL and self.cur.cash >= self.takeover_cost(i))
+
+    def takeover(self, i: int) -> bool:
+        if not self.can_takeover(i):
+            return False
+        cost, o = self.takeover_cost(i), self.owner[i]
+        self.cur.items.remove("mna")
+        self.cur.cash -= cost
+        self.players[o].cash += cost
+        self.owner[i] = self.turn
         return True
 
     def pay_rent(self, i: int) -> int:
         o = self.owner.get(i)
+        self.shielded = False
         if o is None or o == self.turn:
+            return 0
+        if "shield" in self.cur.items:  # 보안 감사 통과: 한 번 면제
+            self.cur.items.remove("shield")
+            self.shielded = True
             return 0
         r = self.rent_at(i)
         self.cur.cash -= r
@@ -276,7 +369,7 @@ class Game:
         for i in sorted((i for i, o in self.owner.items() if o == who), key=lambda i: CELLS[i].price):
             if p.cash >= 0:
                 break
-            p.cash += (CELLS[i].price + self.level.get(i, 0) * upgrade_cost(CELLS[i])) // 2
+            p.cash += (CELLS[i].price + invested(CELLS[i], self.level.get(i, 0))) // 2
             del self.owner[i]
             self.level.pop(i, None)
             sold.append(i)
@@ -304,12 +397,20 @@ class Game:
     # ---- 컴퓨터의 판단 ----
     def cpu_buys(self, i: int) -> bool:
         c, p = CELLS[i], self.cur
-        keep = 120 if any(self.owner.get(j) == self.turn for j, x in enumerate(CELLS) if x.group == c.group) else 200
-        return p.cash - c.price >= keep
+        same_group = any(self.owner.get(j) == self.turn for j, x in enumerate(CELLS) if x.group == c.group)
+        mine = {CELLS[j].art for j, o in self.owner.items() if o == self.turn}
+        toward_synergy = any(any(c.art in alts for alts in s.need) and any(any(a in mine for a in alts) for alts in s.need)
+                             for s in SYNERGIES)  # 이미 시작한 조합에 들어가는 회사
+        keep = 100 if toward_synergy else (120 if same_group else 200)
+        return p.cash - self.buy_price(i) >= keep
 
     def cpu_upgrades(self, i: int) -> bool:
         c, p = CELLS[i], self.cur
-        return p.cash - upgrade_cost(c) >= (150 if self.monopoly(self.turn, c.group) else 350)
+        lv = self.level.get(i, 0)
+        return p.cash - upgrade_cost(c, lv) >= (150 if self.monopoly(self.turn, c.group) else 350) + (200 if lv >= 2 else 0)
+
+    def cpu_takes_over(self, i: int) -> bool:
+        return self.can_takeover(i) and self.cur.cash - self.takeover_cost(i) >= 300
 
 
 # ---------- 그림 ----------
@@ -414,7 +515,8 @@ def draw_cell(g: Game, i: int, tokens: list[int], highlight: int | None, blink: 
     _pic(img, c.art, c.emoji, 92, 84 if here_any(tokens, i, g) else 98, 76)
     d.text((98, 140), c.name, font=_fit(d, c.name, 21, 178), fill=INK, anchor="mm")
     if c.kind == "company":
-        sub = f"₩{c.price}" if o is None else f"₩{g.rent_at(i)}" + " ▲" * g.level.get(i, 0)
+        lv = g.level.get(i, 0)
+        sub = f"₩{c.price}" if o is None else f"₩{g.rent_at(i)}" + (" ★" if lv >= MAX_LEVEL else " ▲" * lv)
         d.text((98, 166), sub, font=_fit(d, sub, 19, 178, 6), fill=DIM if o is None else INK, anchor="mm")
     else:
         hint = {"start": t(f"지나면 +{PASS_BONUS}", f"pass +{PASS_BONUS}"), "chance": t("카드 뽑기", "draw a card"),
@@ -463,16 +565,45 @@ def _mid(box: tuple) -> tuple[int, int]:
     return (box[0] + box[2]) // 2, (box[1] + box[3]) // 2
 
 
+def _wrap(d: _Draw, text: str, size: int, width: int, index: int = 6, max_lines: int = 3) -> tuple[list[str], ImageFont.FreeTypeFont]:
+    """칸 너비에 맞게 줄을 나눈다 (띄어쓰기 기준). 줄이 넘치면 글자를 줄인다."""
+    from i18n import tr
+    text = tr(text)  # 그리기 전 번역된 길이로 잰다
+    while True:
+        font = _kr(size, index)
+        lines, cur = [], ""
+        for word in text.split():
+            nxt = f"{cur} {word}".strip()
+            if cur and d.textlength(nxt, font=font) > width:
+                lines.append(cur)
+                cur = word
+            else:
+                cur = nxt
+        lines.append(cur)
+        too_wide = any(d.textlength(ln, font=font) > width for ln in lines)
+        if (len(lines) <= max_lines and not too_wide) or size <= 14:
+            return lines[:max_lines], font
+        size -= 2
+
+
 def _wide_card(d: _Draw, title: str, lines: list[tuple[str, int, tuple]], bg: tuple, accent: tuple) -> None:
-    """넓은 칸(테두리 없음)에 제목과 줄들."""
-    x0, y0, x1, y1 = WBOX
-    d.rounded_rectangle((x0, y0, x1, y1), 22, fill=bg)
-    if title:
-        d.text((x0 + 24, y0 + 32), title, font=_fit(d, title, 26, x1 - x0 - 48), fill=accent, anchor="lm")
-    y = y0 + (78 if title else 60)
-    for text, size, color in lines:
-        d.text((x0 + 24, y), text, font=_fit(d, text, size, x1 - x0 - 48), fill=color, anchor="lm")
-        y += int(size * 1.25)
+    """연출 글: 아래 줄 왼쪽 세 칸에 한 칸씩 나눠 쓴다 (칸 사이 테두리에 글자가 잘리지 않게).
+    첫 칸 = 제목(누가), 둘째 칸 = 첫 줄(핵심), 셋째 칸 = 둘째 줄(설명). 넓은 칸은 연출 중에도 판 지도·돈."""
+    parts = [(title, 26, accent)] + list(lines[:2])
+    if not title:
+        parts = [("", 0, accent)] + list(lines[:2])
+    for k in range(3):
+        x0, y0, x1, y1 = _box(k, 2)
+        d.rounded_rectangle((x0, y0, x1, y1), 22, fill=bg)
+        if k >= len(parts) or not parts[k][0]:
+            continue
+        text, size, color = parts[k]
+        rows, font = _wrap(d, text, min(size, 40), x1 - x0 - 20)
+        lh = int(font.size * 1.2)
+        y = (y0 + y1) // 2 - lh * (len(rows) - 1) // 2
+        for ln in rows:
+            d.text(((x0 + x1) // 2, y), ln, font=font, fill=color, anchor="mm")
+            y += lh
 
 
 # ---------- 칸마다 어울리는 움직임 (인수·증설·사용료 장면에서 그림 뒤에 그린다) ----------
@@ -628,7 +759,8 @@ def cut_frame(kind: str, prog: float, data: dict) -> Image.Image:
         cell_fx(d, cell, prog, *_mid(_box(2, 0)))
         _pic(img, cell.art, cell.emoji, int(70 + 120 * pop), *_mid(_box(2, 0)))
         _ctext(d, _box(2, 1), cell.name, 34, INK)
-        stamp = t("인수 완료!", "Acquired!") if kind == "buy" else t("서버 증설!", "Scaled up!")
+        stamp = t("인수 완료!", "Acquired!") if kind == "buy" else (
+            t("유니콘 본사 완공!", "Unicorn HQ built!") if data.get("landmark") else t("서버 증설!", "Scaled up!"))
         _wide_card(d, who, [(stamp if prog > 0.3 else "…", 56, color)], (20, 22, 32), color)
     elif kind == "rent":
         cell = data["cell"]
@@ -645,6 +777,25 @@ def cut_frame(kind: str, prog: float, data: dict) -> Image.Image:
         _ctext(d, _box(2, 1), "→", 90, (229, 72, 77))
         shown = int(amt * min(1.0, prog / 0.5))
         _wide_card(d, t("API 사용료", "API fee"), [(f"₩{shown}", 80, (229, 72, 77))], (20, 22, 32), DIM)
+    elif kind == "synergy":
+        syn: Synergy = data["synergy"]
+        _paste(img, syn.emoji, int(120 + 60 * min(1.0, prog * 2)), *_mid(_box(2, 0)))
+        draw_fx(d, "sparkle", prog, *_mid(_box(2, 0)), (250, 204, 21), syn.key)
+        _paste(img, syn.emoji, int(120 + 60 * min(1.0, prog * 2)), *_mid(_box(2, 0)))
+        _ctext(d, _box(2, 1), syn.name, 30, (250, 204, 21))
+        _wide_card(d, t(f"{who} · 시너지 달성!", f"{who} · Synergy!"), [(syn.name, 44, (250, 204, 21)), (syn.effect, 26, INK)],
+                   (20, 22, 32), color)
+    elif kind == "shield":
+        _paste(img, "🛡️", int(120 + 50 * min(1.0, prog * 2)), *_mid(_box(2, 0)))
+        _wide_card(d, who, [(t("보안 감사 통과: 사용료 면제!", "Security audit: fee waived!"), 40, (46, 196, 160))],
+                   (20, 22, 32), color)
+    elif kind == "takeover":
+        cell = data["cell"]
+        cell_fx(d, cell, prog, *_mid(_box(2, 0)))
+        _pic(img, cell.art, cell.emoji, 180, *_mid(_box(2, 0)))
+        _paste(img, "🤝", 100, *_mid(_box(2, 1)))
+        _wide_card(d, who, [(t("인수합병 성공!", "M&A done!"), 48, color), (data.get("line", ""), 26, INK)],
+                   (20, 22, 32), color)
     elif kind == "pass":
         _pic(img, data.get("art", "start"), data.get("emoji", "🚀"), int(120 + 50 * min(1.0, prog * 2)), *_mid(_box(2, 0)))
         _paste(img, "💰", 110, *_mid(_box(2, 1)))
@@ -698,7 +849,7 @@ def split_full(img: Image.Image) -> tuple[dict[int, bytes], bytes]:
 
 # ---------- 진행 ----------
 CUT_LEN = {"dice": 1.4, "card": 2.2, "buy": 1.3, "upgrade": 1.3, "rent": 1.6, "pass": 1.1, "outage": 1.5,
-           "bankrupt": 1.8, "title": 1.6, "win": 6.0, "lose": 6.0}
+           "bankrupt": 1.8, "title": 1.6, "win": 6.0, "lose": 6.0, "synergy": 2.2, "shield": 1.4, "takeover": 1.8}
 STEP = 0.22  # 말이 한 칸 가는 시간
 
 
@@ -783,7 +934,8 @@ class Tycoon:
         self._later(dur, self._end_cut)
 
     SOUND = {"dice": "card", "card": "flip", "buy": "coin", "upgrade": "levelup", "rent": "bad", "pass": "win",
-             "outage": "boom", "bankrupt": "dead", "win": "jackpot", "lose": "lose", "title": "intro"}
+             "outage": "boom", "bankrupt": "dead", "win": "jackpot", "lose": "lose", "title": "intro",
+             "synergy": "jackpot", "shield": "levelup", "takeover": "coin"}
 
     def _begin(self, kind: str, data: dict) -> None:
         play(self.SOUND[kind], 0)
@@ -814,14 +966,34 @@ class Tycoon:
         if self.phase == "over":
             self.start()
             return
-        if self.phase == "roll" and idx == BTN_A:
+        g = self.g
+        if self.phase in ("roll", "pivot") and idx == BTN_A:
             self._turn()
+        elif self.phase == "roll" and idx == BTN_B and "pivot" in g.cur.items:
+            self.phase = "pivot"  # 피벗: 보이는 8칸 중 하나를 누르면 그 칸으로
+            self.log = (t("피벗: 갈 칸을 누르세요", "Pivot: tap a cell"), t("오른쪽 아래: 취소", "Bottom right: cancel"))
+        elif self.phase == "pivot" and idx == BTN_B:
+            self.phase = "roll"
+            self.log = (t("내 차례", "Your turn"), t("오른쪽 위 굴리기를 누르세요", "Press Roll (top right)"))
+        elif self.phase == "pivot" and idx in WINDOW_TILES:
+            target = (window_start(self.tokens[g.turn]) + WINDOW_TILES.index(idx)) % N
+            if target != g.cur.pos:
+                g.cur.items.remove("pivot")
+                self.phase = "busy"
+                g.move_to(target, passing=False)
+                self.tokens[g.turn] = target
+                self.log = (t("피벗!", "Pivot!"), CELLS[target].name)
+                self._later(0.3, lambda: self._arrive(target))
         elif self.phase == "choose" and self.choice and idx in (BTN_A, BTN_B):
             kind, i = self.choice
             self.choice = None
             self.phase = "busy"
             if idx == BTN_A:
                 self._do_choice(kind, i)
+            elif kind == "takeover":  # 인수합병을 안 쓰면 사용료를 낸다
+                self._pay(i)
+                self._bump()
+                return
             self._later(0.3, self._end_turn)
         self._bump()
 
@@ -838,6 +1010,8 @@ class Tycoon:
             self._bump()
             self._later(1.0, self._end_turn)
             return
+        if "agi" in g.synergies(g.turn):
+            p.cash += AGI_GRANT
         if p.cpu:
             self.phase = "busy"
             self.log = (t(f"{p.name} 차례", f"{p.name}'s turn"), t("생각하는 중…", "Thinking…"))
@@ -880,36 +1054,45 @@ class Tycoon:
         if c.kind == "company":
             o = g.owner.get(pos)
             if o is None:
-                if p.cash >= c.price:
+                price = g.buy_price(pos)
+                if p.cash >= price:
                     self._offer("buy", pos)
                     return
-                self.log = (c.name, t(f"₩{c.price} · 돈이 모자라요", f"₩{c.price} · not enough cash"))
+                self.log = (c.name, t(f"₩{price} · 돈이 모자라요", f"₩{price} · not enough cash"))
             elif o == g.turn:
-                if g.level.get(pos, 0) < 2 and p.cash >= upgrade_cost(c):
+                lv = g.level.get(pos, 0)
+                cost = upgrade_cost(c, lv)
+                if lv >= MAX_LEVEL:
+                    self.log = (c.name, t("유니콘 본사 · 최대 단계예요", "Unicorn HQ · max level"))
+                elif p.cash >= cost:
                     self._offer("upgrade", pos)
                     return
-                self.log = (c.name, t("내 회사예요", "Your company"))
+                else:
+                    what = t("유니콘 본사", "Unicorn HQ") if lv >= 2 else t("증설", "Scale-up")
+                    self.log = (c.name, t(f"{what} ₩{cost} · 돈이 모자라요", f"{what} ₩{cost} · not enough cash"))
+            elif g.can_takeover(pos):  # 인수합병 제안서가 있으면 사용료 대신 사 올지 묻는다
+                self._offer("takeover", pos)
+                return
             else:
-                amt = g.pay_rent(pos)
-                owner = g.players[o].name
-                line = t(f"{p.name} → {owner}", f"{p.name} → {owner}")
-                self._show("rent", {"cell": c, "amount": amt, "line": line,
-                                    "from": (p.name, p.color), "to": (owner, g.players[o].color)})
-                self.log = (t(f"API 사용료 ₩{amt}", f"API fee ₩{amt}"), line)
-                self._later(0.0, self._check_debt)
+                self._pay(pos)
+                return
         elif c.kind == "chance":
             card = g.draw()
             self._show("card", {"card": card})
             self._later(0.0, lambda: self._apply_card(card))
             return
         elif c.kind == "bonus":
-            p.cash += BONUS
-            self.log = (t(f"{p.name}: AI 학회 발표 상금 +{BONUS}", f"{p.name}: summit prize +{BONUS}"), c.name)
-            self._show("pass", {"who": p.name, "color": p.color, "text": t(f"학회 상금 +{BONUS}", f"Prize +{BONUS}"), "art": "conference", "emoji": "🎤"})
+            prize = BONUS * 2 if "health" in g.synergies(g.turn) else BONUS  # 헬스케어 AI 시너지: 2배
+            p.cash += prize
+            self.log = (t(f"{p.name}: AI 학회 발표 상금 +{prize}", f"{p.name}: summit prize +{prize}"), c.name)
+            self._show("pass", {"who": p.name, "color": p.color, "text": t(f"학회 상금 +{prize}", f"Prize +{prize}"), "art": "conference", "emoji": "🎤"})
         elif c.kind == "tax":
-            p.cash -= TAX
-            self.log = (t(f"{p.name}: 클라우드 정산 -{TAX}", f"{p.name}: cloud bill -{TAX}"), c.name)
-            self._later(0.0, self._check_debt)
+            if "vertical" in g.synergies(g.turn):  # 수직 계열화 시너지: 정산 면제
+                self.log = (t(f"{p.name}: 수직 계열화로 정산 면제", f"{p.name}: vertical stack, no bill"), c.name)
+            else:
+                p.cash -= TAX
+                self.log = (t(f"{p.name}: 클라우드 정산 -{TAX}", f"{p.name}: cloud bill -{TAX}"), c.name)
+                self._later(0.0, self._check_debt)
         elif c.kind == "again":
             self.log = (t(f"{p.name}: 해커톤! 한 번 더", f"{p.name}: hackathon! roll again"), c.name)
             self._bump()
@@ -924,11 +1107,34 @@ class Tycoon:
         self._bump()
         self._later(0.6, self._end_turn)
 
+    def _pay(self, pos: int) -> None:
+        """남의 회사에 섰을 때: 사용료 (면제권이 있으면 면제). 차례를 끝낸다."""
+        g = self.g
+        c, p, o = CELLS[pos], g.cur, g.owner.get(pos)
+        amt = g.pay_rent(pos)
+        owner = g.players[o].name if o is not None else ""
+        if g.shielded:
+            self._show("shield", {"who": p.name, "color": p.color})
+            self.log = (t("보안 감사 통과: 사용료 면제", "Security audit: fee waived"), c.name)
+        else:
+            line = t(f"{p.name} → {owner}", f"{p.name} → {owner}")
+            self._show("rent", {"cell": c, "amount": amt, "line": line,
+                                "from": (p.name, p.color), "to": (owner, g.players[o].color)})
+            self.log = (t(f"API 사용료 ₩{amt}", f"API fee ₩{amt}"), line)
+            self._later(0.0, self._check_debt)
+        self._bump()
+        self._later(0.6, self._end_turn)
+
+    def _cost(self, kind: str, pos: int) -> int:
+        g = self.g
+        return {"buy": g.buy_price(pos), "upgrade": upgrade_cost(CELLS[pos], g.level.get(pos, 0)),
+                "takeover": g.takeover_cost(pos)}[kind]
+
     def _apply_card(self, card: Card) -> None:
         g = self.g
         before = g.cur.pos
         g.apply_card(card)
-        self.log = (card.title, card.desc)
+        self.log = (card.title, card.desc if card.kind != "keep" else t("보관함에 넣었어요", "Kept for later"))
         if g.cur.pos != before:  # 이동 카드: 말 옮기고 도착 칸 처리
             self.tokens[g.turn] = g.cur.pos
             if card.kind == "goto_start":
@@ -947,27 +1153,44 @@ class Tycoon:
     def _offer(self, kind: str, pos: int) -> None:
         g = self.g
         c = CELLS[pos]
-        cost = c.price if kind == "buy" else upgrade_cost(c)
+        cost = self._cost(kind, pos)
+        landmark = kind == "upgrade" and g.level.get(pos, 0) >= 2
         if g.cur.cpu:
-            yes = g.cpu_buys(pos) if kind == "buy" else g.cpu_upgrades(pos)
-            self.log = (c.name, (t(f"₩{cost} 인수", f"buys for ₩{cost}") if kind == "buy" else t(f"₩{cost} 증설", f"scales up ₩{cost}"))
-                        if yes else t("넘어가요", "passes"))
+            yes = {"buy": g.cpu_buys, "upgrade": g.cpu_upgrades, "takeover": g.cpu_takes_over}[kind](pos)
+            done = {"buy": t(f"₩{cost} 인수", f"buys for ₩{cost}"), "upgrade": t(f"₩{cost} 증설", f"scales up ₩{cost}"),
+                    "takeover": t(f"₩{cost} 인수합병", f"M&A ₩{cost}")}[kind]
+            self.log = (c.name, done if yes else t("넘어가요", "passes"))
             self._bump()
             if yes:
                 self._later(0.5, lambda: self._do_choice(kind, pos))
+            elif kind == "takeover":
+                self._later(0.5, lambda: self._pay(pos))
+                return
             self._later(0.8, self._end_turn)
             return
         self.choice = (kind, pos)
         self.phase = "choose"
-        self.log = (c.name, t(f"₩{cost} 에 인수할까요?", f"Buy for ₩{cost}?") if kind == "buy"
-                    else t(f"₩{cost} 에 서버를 증설할까요?", f"Scale up for ₩{cost}?"))
+        ask = {"buy": t(f"₩{cost} 에 인수할까요?", f"Buy for ₩{cost}?"),
+               "upgrade": t(f"₩{cost} 에 유니콘 본사를 지을까요?", f"Build Unicorn HQ for ₩{cost}?") if landmark
+               else t(f"₩{cost} 에 서버를 증설할까요?", f"Scale up for ₩{cost}?"),
+               "takeover": t(f"인수합병 제안서로 ₩{cost} 에 사 올까요? (아니면 사용료)", f"Use M&A offer for ₩{cost}? (else pay fee)")}[kind]
+        self.log = (c.name, ask)
         self._bump()
 
     def _do_choice(self, kind: str, pos: int) -> None:
         g = self.g
-        ok = g.buy(pos) if kind == "buy" else g.upgrade(pos)
+        before = set(g.synergies(g.turn))
+        owner = g.owner.get(pos)
+        ok = {"buy": g.buy, "upgrade": g.upgrade, "takeover": g.takeover}[kind](pos)
         if ok:
-            self._show(kind, {"cell": CELLS[pos], "who": g.cur.name, "color": g.cur.color})
+            data = {"cell": CELLS[pos], "who": g.cur.name, "color": g.cur.color,
+                    "landmark": kind == "upgrade" and g.level.get(pos, 0) >= MAX_LEVEL}
+            if kind == "takeover" and owner is not None:
+                data["line"] = t(f"{g.players[owner].name} 에게서 {CELLS[pos].name}", f"{CELLS[pos].name} from {g.players[owner].name}")
+            self._show(kind, data)
+            for key in [k for k in g.synergies(g.turn) if k not in before]:  # 새로 갖춘 시너지
+                self._show("synergy", {"synergy": SYN[key], "who": g.cur.name, "color": g.cur.color})
+                self.log = (t(f"{g.cur.name}: 시너지 {SYN[key].name}", f"{g.cur.name}: synergy {SYN[key].name}"), SYN[key].effect)
         self._bump()
 
     def _check_debt(self) -> None:
@@ -1039,7 +1262,8 @@ class Tycoon:
         if self.cut is not None:
             kind, t0, data = self.cut
             prog = min(1.0, (now - t0) / CUT_LEN[kind])
-            out, self._wide = split_full(cut_frame(kind, prog, data))
+            out, _ = split_full(cut_frame(kind, prog, data))
+            self._wide = self._board_wide()  # 연출 중에도 넓은 칸은 판 지도·돈
         else:
             blink = False  # 깜빡이면 매번 판 전체를 다시 보내야 해서 끔 (테두리로만 표시)
             start = window_start(self.tokens[self.g.turn])
@@ -1053,13 +1277,20 @@ class Tycoon:
         g = self.g
         me = g.players[0]
         if self.phase == "roll":
-            return (button(t("굴리기", "Roll"), "", PLAYER_COLORS[0], True, "🎲"),
-                    button(f"₩{me.cash}", t("내 돈", "Cash"), (40, 42, 54), False))
+            second = (button(t("피벗", "Pivot"), t("보이는 칸으로", "jump to a cell"), (124, 58, 237), True, "🔀")
+                      if "pivot" in me.items else button(f"₩{me.cash}", t("내 돈", "Cash"), (40, 42, 54), False))
+            return button(t("굴리기", "Roll"), "", PLAYER_COLORS[0], True, "🎲"), second
+        if self.phase == "pivot":
+            return (button(t("굴리기", "Roll"), t("피벗 안 씀", "skip pivot"), PLAYER_COLORS[0], True, "🎲"),
+                    button(t("취소", "Cancel"), t("칸을 누르면 이동", "tap a cell to jump"), (70, 72, 90), True))
         if self.phase == "choose" and self.choice:
             kind, i = self.choice
-            cost = CELLS[i].price if kind == "buy" else upgrade_cost(CELLS[i])
-            return (button(t("인수", "Buy") if kind == "buy" else t("증설", "Scale up"), f"₩{cost}", (46, 160, 110), True, "✍️"),
-                    button(t("넘어가기", "Pass"), f"₩{me.cash}", (70, 72, 90), True))
+            cost = self._cost(kind, i)
+            label = {"buy": t("인수", "Buy"), "upgrade": t("본사 짓기", "Build HQ") if self.g.level.get(i, 0) >= 2
+                     else t("증설", "Scale up"), "takeover": t("인수합병", "M&A")}[kind]
+            no = t("사용료 내기", "Pay fee") if kind == "takeover" else t("넘어가기", "Pass")
+            return (button(label, f"₩{cost}", (46, 160, 110), True, "✍️"),
+                    button(no, f"₩{me.cash}", (70, 72, 90), True))
         if self.phase == "over":
             return (button(t("새 게임", "New game"), "", PLAYER_COLORS[0], True, "🔁"),
                     button(t("메뉴", "Menu"), t("가운데 버튼", "middle key"), (70, 72, 90), False))
@@ -1068,9 +1299,10 @@ class Tycoon:
                 button(f"₩{me.cash}", t("내 돈", "Cash"), (40, 42, 54), False))
 
     def wide(self) -> bytes:
-        if self.cut is not None:
-            self.tiles()
-            return self._wide
+        return self._board_wide()
+
+    def _board_wide(self) -> bytes:
+        """넓은 칸: 판 전체 지도 + 소식 + 세 사람의 돈 + 내 보관 카드·시너지 (연출 중에도 그대로)."""
         g = self.g
         img = Image.new("RGB", WIDE, (13, 14, 20))
         d = _Draw(img)
@@ -1109,4 +1341,10 @@ class Tycoon:
             d.text((tx + 24, y), p.name, font=_fit(d, p.name, 18, 110), fill=DIM if p.out else INK, anchor="lm")
             d.text((WIDE[0] - 14, y), t("파산", "bust") if p.out else f"₩{p.cash}", font=_kr(20, 6),
                    fill=(229, 72, 77) if p.out or p.cash < 150 else INK, anchor="rm")
+        # 맨 아래: 내 보관 카드와 시너지 (글자로: 이모지는 글꼴에 없음)
+        me = g.players[0]
+        parts = [ITEMS[k][1] for k in me.items] + [SYN[k].name for k in g.synergies(0)]
+        if parts:
+            line = t("보관·시너지: ", "Kept/synergy: ") + " · ".join(parts)
+            d.text((12, WIDE[1] - 14), line, font=_fit(d, line, 15, WIDE[0] - 24, 4), fill=(250, 204, 21), anchor="lm")
         return _png(img)
