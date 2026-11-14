@@ -19,9 +19,3 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-
----
-
-The D200 wire protocol implementation is based on redphx/strmdck
-(https://github.com/redphx/strmdck), MIT License, and the protocol notes in
-jcalado/companion-surface-d200 (https://github.com/jcalado/companion-surface-d200).

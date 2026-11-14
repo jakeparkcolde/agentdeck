@@ -1,0 +1,3 @@
+The D200 wire protocol implementation is based on redphx/strmdck
+(https://github.com/redphx/strmdck), MIT License, and the protocol notes in
+jcalado/companion-surface-d200 (https://github.com/jcalado/companion-surface-d200).
