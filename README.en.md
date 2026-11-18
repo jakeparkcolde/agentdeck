@@ -122,7 +122,7 @@ Korean stocks coloured by daily change, like [HeatTab](https://heattab.app) (red
 <td valign="top">
 
 ### 7 · Games
-The top ten keys become a game board: **whack-a-mole** (30 s, golden +3, bomb −3), **memory** (repeat the order keys light up in), **pairs** with the aquarium friends, **slots** where you stop each reel yourself, **blackjack** with hit, stand and double, a **poker duel** against the computer, and a **horse race** (win, quinella, exacta and trio bets) run across a track made from the top five keys. Scores and coins are saved.
+The top ten keys become a game board: **whack-a-mole** (30 s, golden +3, bomb −3), **memory** (repeat the order keys light up in), **pairs** with the aquarium friends, **slots** where you stop each reel yourself, **blackjack** with hit, stand and double, a **poker duel** against the computer, a **horse race** (win, quinella, exacta and trio bets) run across a track made from the top five keys, and **AI Startup Tycoon**, a dice board game where you buy AI companies and collect API fees against two computer players. Scores and coins are saved.
 
 <sub>→ [Guide: games](docs/GUIDE.en.md#47-games-page-7)</sub>
 
