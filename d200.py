@@ -24,6 +24,8 @@ from PIL import Image, ImageDraw, ImageFont
 from i18n import t
 
 VID, PID = 0x2207, 0x0019
+STUCK_VID, STUCK_PID = 0x18D1, 0xD002  # 바로 꽂았을 때 가끔 이것만 잡힌다 (revive_stuck_device)
+REVIVE_WAIT_S = 6
 PACKET = 1024
 HEADER = 8
 COLS, ROWS = 5, 3
@@ -200,9 +202,64 @@ def build_zip(buttons: dict[int, Button], small_png: bytes | None = None) -> byt
     raise RuntimeError("could not build firmware-safe zip")
 
 
+def _load_libusb():
+    """libusb 를 찾으면 돌려준다 (없으면 None — 그때는 깨우기를 건너뛴다)."""
+    import ctypes
+    import ctypes.util
+
+    for name in (ctypes.util.find_library("usb-1.0"), "/opt/homebrew/lib/libusb-1.0.dylib",
+                 "/usr/local/lib/libusb-1.0.dylib", "libusb-1.0.so.0"):
+        if not name:
+            continue
+        try:
+            return ctypes.CDLL(name)
+        except OSError:
+            continue
+    return None
+
+
+# @MX:NOTE: 컴퓨터에 바로 꽂으면 D200 이 가끔 18d1:d002(응답 없는 디버그 모양 장치)로만 잡히고
+#           진짜 HID(2207:0019)가 안 나온다. USB 리셋을 한 번 보내면 다시 인식되면서 HID 로 올라온다
+#           (2026-11-18 맥북 직결에서 확인. 리셋 호출 자체는 장치가 사라져 NOT_FOUND 를 돌려준다).
+def revive_stuck_device(lib=None) -> bool:
+    """디버그 모양으로 멈춘 D200 에 USB 리셋을 보낸다. 리셋을 보냈으면 True."""
+    import ctypes
+
+    lib = lib or _load_libusb()
+    if lib is None:
+        return False
+    lib.libusb_open_device_with_vid_pid.restype = ctypes.c_void_p
+    lib.libusb_open_device_with_vid_pid.argtypes = [ctypes.c_void_p, ctypes.c_uint16, ctypes.c_uint16]
+    lib.libusb_reset_device.argtypes = [ctypes.c_void_p]
+    lib.libusb_close.argtypes = [ctypes.c_void_p]
+    lib.libusb_exit.argtypes = [ctypes.c_void_p]
+    ctx = ctypes.c_void_p()
+    if lib.libusb_init(ctypes.byref(ctx)) != 0:
+        return False
+    try:
+        handle = lib.libusb_open_device_with_vid_pid(ctx, STUCK_VID, STUCK_PID)
+        if not handle:
+            return False
+        lib.libusb_reset_device(handle)
+        lib.libusb_close(handle)
+        return True
+    finally:
+        lib.libusb_exit(ctx)
+
+
+def _find_hid() -> dict | None:
+    return next((d for d in hid.enumerate(VID, PID) if d["interface_number"] == 0), None)
+
+
 class D200:
     def __init__(self) -> None:
-        info = next((d for d in hid.enumerate(VID, PID) if d["interface_number"] == 0), None)
+        info = _find_hid()
+        if not info and revive_stuck_device():
+            for _ in range(REVIVE_WAIT_S * 2):  # 리셋 뒤 HID 가 올라올 때까지 잠깐 기다린다
+                time.sleep(0.5)
+                info = _find_hid()
+                if info:
+                    break
         if not info:
             raise RuntimeError(t("D200 을 찾지 못했어요 (USB 연결과 Ulanzi Studio 종료를 확인하세요)",
                                  "D200 not found (check the USB cable and quit Ulanzi Studio)"))

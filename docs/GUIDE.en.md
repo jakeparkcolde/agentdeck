@@ -391,6 +391,7 @@ Everything lives in `config.json`. **Anything you leave out is turned off.** Res
 | Symptom | Fix |
 |---|---|
 | The screen doesn't change | Fully quit Ulanzi Studio, replug the device, restart the dashboard |
+| Plugged straight into the computer, the D200 only shows its default keys | Sometimes the device shows up only as a different USB device (`18d1:d002`). With `brew install libusb` the dashboard resets it automatically. Without it, replug or connect through a USB hub |
 | Pressing keys types text | The dashboard isn't running, so the device is in its default keyboard mode. Check `dashboard.log` |
 | No agents show up (hooks) | Only sessions **started after installing** appear. Check that files appear in `~/.cache/d200/agents` |
 | Another Mac shows "OFF" | Make sure `ssh host echo ok` works without a password |
