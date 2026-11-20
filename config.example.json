@@ -53,7 +53,7 @@
   "shortcuts": {
     "title": "바로가기",
     "items": [
-      {"name": "Example", "sub": "short note", "open": "https://example.com"}
+      {"name": "Example", "sub": "short note", "open": "https://example.com", "color": "#7aa2f7", "emoji": "✨"}
     ]
   },
   "market": {

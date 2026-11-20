@@ -1,10 +1,14 @@
 """바로가기 페이지: 홈 칸, 칸 그리기, 열기, 넓은 칸으로 열 개씩 넘기기 (open 은 가짜로)."""
 
+import io
 import unittest
 from unittest.mock import patch
 
+from PIL import Image
+
 import present
 import shortcuts
+from d200 import render_icon
 from shortcuts import State
 
 
@@ -69,6 +73,32 @@ class PageTest(unittest.TestCase):
                {"name": "C", "open": "/Applications/Notes.app"}]
         b = shortcuts.page(State(), its)
         self.assertEqual((b[0].sub, b[1].sub, b[2].sub), ("example.com", "메모", "Notes"))
+
+
+class LookTest(unittest.TestCase):
+    """칸은 직접 그린 196x196 PNG, 색은 config 의 color 또는 이름의 고정 해시."""
+
+    def test_filled_keys_are_196_png(self):
+        its = shortcuts.items(_cfg(3)) + [{"name": "프로덕트 디스커버리", "emoji": "🐱", "open": "https://p.example"},
+                                          {"name": "Seoul Unlayered", "color": "#ff9e64", "open": "https://s.example"}]
+        b = shortcuts.page(State(), its)
+        for k in range(10):
+            png = b[k].image
+            self.assertIsNotNone(png, k)
+            self.assertTrue(png.startswith(b"\x89PNG"), k)
+            with Image.open(io.BytesIO(png)) as im:
+                self.assertEqual(im.size, (196, 196), k)
+            self.assertIs(render_icon(b[k]), png)  # 장치로 그대로 나간다
+
+    def test_same_name_same_color(self):
+        a = shortcuts.color_of({"name": "깃밥", "open": "https://a"})
+        self.assertEqual(a, shortcuts.color_of({"name": "깃밥", "open": "https://other", "sub": "x"}))
+        self.assertIn(a, shortcuts.PALETTE)
+        self.assertEqual(shortcuts.color_of({"name": "깃밥", "color": "#123456"}), "#123456")
+        self.assertGreater(len({shortcuts.color_of({"name": f"사이트{i}"}) for i in range(40)}), 3)
+        its = shortcuts.items(_cfg(2))
+        self.assertEqual(shortcuts.page(State(), its)[0].image, shortcuts.page(State(), its)[0].image)
+        self.assertEqual(shortcuts.page(State(), its)[0].accent, shortcuts.color_of(its[0]))
 
 
 if __name__ == "__main__":
