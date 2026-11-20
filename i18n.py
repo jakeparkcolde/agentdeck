@@ -69,6 +69,7 @@ PATTERNS: list[tuple[str, str]] = [
     (r"(\d+)회$", r"\1x"),
     (r"(\d+)종$", r"\1 games"),
     (r"가동 (\d+)일", r"up \1d"),
+    (r"(\d+)–(\d+) / 총 (\d+)개", r"\1–\2 of \3"),
     (r"(\d+)개 항목", r"\1 items"),
     (r"(\d+)개", r"\1 items"),
     (r"(최고|시도) (\d+)번", r"\1 \2"),  # 게임 횟수
@@ -222,7 +223,8 @@ WORDS: list[tuple[str, str]] = sorted([
     ("질문 시점 표시", "mark a question"), ("● 녹음", "● Rec"), ("강의 녹음", "Lecture rec"), ("끝나면 강의 노트로", "→ lecture notes"),
     ("녹음 중에 사용", "while recording"), ("중요", "Key"), ("질문", "Question"), ("발표 타이머", "talk timer"),
     ("짧게: 계속 · 길게: 초기화", "tap: resume · hold: reset"), ("짧게: 멈춤 · 길게: 초기화", "tap: pause · hold: reset"),
-    ("누를 때마다 바꾸기", "tap to change"), ("목표 시간", "Target"), ("눌러서 열기", "tap to open"), ("남음 ", "left "),
+    ("누를 때마다 바꾸기", "tap to change"), ("목표 시간", "Target"), ("눌러서 열기", "tap to open"),
+    ("눌러 열기 · 길게: 다음", "tap: open · hold: next"), ("시연 바로가기", "Demo shortcuts"), ("남음 ", "left "),
     ("초과 ", "over "), ("녹음 꺼짐", "not recording"), ("손쉬운 사용 권한을 확인하세요", "check Accessibility permission"),
     ("키를 못 보냈어요", "Couldn't send key"), ("★ 중요 · Q 질문 표시를 쓸 수 있어요", "★ key · Q question marks ready"),
     ("녹음 시작", "Recording"), ("시작", "Start"), ("녹음 못 함", "Can't record"), ("마이크 권한을 확인하세요", "check microphone permission"),

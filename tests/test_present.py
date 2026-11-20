@@ -107,5 +107,54 @@ class PressTest(unittest.TestCase):
         self.assertTrue(present.wide(p).startswith(b"\x89PNG"))
 
 
+def _demos(n):
+    return [{"name": f"데모{i}", "open": f"https://d{i}.example"} for i in range(1, n + 1)]
+
+
+class DemoPageTest(unittest.TestCase):
+    def test_four_demos_page_by_long_press(self):
+        p, demos = Presenter(), _demos(4)
+        b = present.page(p, demos=demos)
+        self.assertEqual((b[8].header, b[9].header), ("시연 1", "시연 2"))
+        self.assertEqual(b[8].sub, "눌러 열기 · 길게: 다음")
+        with patch.object(present, "open_target", return_value=True) as o:
+            present.press(p, 8, 1.0, 0.6, demos=demos)
+            self.assertEqual(p.demo_page, 1)
+            o.assert_not_called()
+            self.assertEqual(p.msg[:2], ("시연 바로가기", "3–4 / 총 4개"))
+            b = present.page(p, demos=demos)
+            self.assertEqual((b[8].header, b[8].title, b[9].header, b[9].title), ("시연 3", "데모3", "시연 4", "데모4"))
+            present.press(p, 9, 0, 0.6, demos=demos)
+            o.assert_called_once_with("https://d4.example")
+            present.press(p, 9, 1.0, 0.6, demos=demos)
+        self.assertEqual(p.demo_page, 0)
+        self.assertEqual(p.msg[1], "1–2 / 총 4개")
+
+    def test_three_demos_empty_slot(self):
+        p, demos = Presenter(demo_page=1), _demos(3)
+        b = present.page(p, demos=demos)
+        self.assertEqual((b[8].header, b[8].title), ("시연 3", "데모3"))
+        self.assertEqual((b[9].title, b[9].sub), ("-", "config: presentation.demos"))
+        with patch.object(present, "open_target", return_value=True) as o:
+            present.press(p, 9, 0, 0.6, demos=demos)
+            o.assert_not_called()
+            present.press(p, 9, 1.0, 0.6, demos=demos)  # 빈 칸도 길게 누르면 다음 묶음
+        self.assertEqual(p.demo_page, 0)
+        self.assertEqual(p.msg[1], "1–2 / 총 3개")
+
+    def test_page_clamps_when_list_shrinks(self):
+        p, demos = Presenter(demo_page=5), _demos(4)
+        b = present.page(p, demos=demos)
+        self.assertEqual((b[8].header, b[9].header), ("시연 3", "시연 4"))
+
+    def test_two_demos_long_press_still_opens(self):
+        p, demos = Presenter(), _demos(2)
+        self.assertEqual(present.page(p, demos=demos)[8].sub, "눌러서 열기")
+        with patch.object(present, "open_target", return_value=True) as o:
+            present.press(p, 9, 1.0, 0.6, demos=demos)
+        o.assert_called_once_with("https://d2.example")
+        self.assertEqual(p.demo_page, 0)
+
+
 if __name__ == "__main__":
     unittest.main()

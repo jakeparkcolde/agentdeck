@@ -7,6 +7,7 @@
 - 설정 (config.json, 모두 선택):
     "presentation": {"mic": "AU05", "save_dir": "~/Movies/agentdeck",
                      "demos": [{"name": "데모 사이트", "open": "https://example.com"}, {"name": "터미널", "open": "/System/Applications/Utilities/Terminal.app"}]}
+  시연은 8·9번 칸에 두 개씩 보인다. 세 개 이상이면 8 또는 9를 길게 눌러 다음 두 개로 넘긴다 (끝나면 처음으로).
 """
 
 from __future__ import annotations
@@ -202,6 +203,7 @@ class Presenter:
     questions: list[float] = field(default_factory=list)
     rec: Recorder = field(default_factory=Recorder)
     msg: tuple[str, str, float] | None = None  # (제목, 내용, 사라지는 시각)
+    demo_page: int = 0  # 시연 바로가기 몇 번째 묶음 (8·9번 칸에 두 개씩)
 
     # 타이머
     def elapsed(self, now: float | None = None) -> float:
@@ -249,6 +251,14 @@ class Presenter:
 
 
 # ---------- 화면 ----------
+def demo_slots(p: Presenter, demos: list[dict]) -> tuple[int, int]:
+    """8·9번 칸에 보일 시연 번호 (0부터). 목록이 줄었으면 묶음 수로 나눈 나머지 묶음."""
+    if len(demos) <= 2:
+        return 0, 1
+    first = 2 * (p.demo_page % ((len(demos) + 1) // 2))
+    return first, first + 1
+
+
 def page(p: Presenter, demos: list[dict] | None = None) -> dict[int, Button]:
     demos = demos if demos is not None else (CFG_P.get("demos") or [])
     now = time.time()
@@ -273,10 +283,11 @@ def page(p: Presenter, demos: list[dict] | None = None) -> dict[int, Button]:
     b[5] = Button(header="타이머", title=title, sub=sub, bg=RED if over else BG, fg="#16161e" if over else "#ffffff",
                   accent="#16161e" if over else col)
     b[6] = Button(header="목표 시간", title=f"{p.target_min}분", sub="누를 때마다 바꾸기", bg=BG, accent=DIM)
-    for k, idx in enumerate((8, 9)):
+    sub = "눌러서 열기" if len(demos) <= 2 else "눌러 열기 · 길게: 다음"
+    for k, idx in zip(demo_slots(p, demos), (8, 9)):
         if k < len(demos):
             b[idx] = Button(header=f"시연 {k + 1}", title=str(demos[k].get("name", ""))[:8],
-                            sub="눌러서 열기", bg=BG, accent="#bb9af7")
+                            sub=sub, bg=BG, accent="#bb9af7")
         else:
             b[idx] = Button(header=f"시연 {k + 1}", title="-", sub="config: presentation.demos", bg=BG, accent=DIM)
     return b
@@ -343,9 +354,16 @@ def press(p: Presenter, idx: int, held: float, long_press: float, demos: list[di
             p.toggle_timer()
     elif idx == 6:
         p.next_target()
-    elif idx in (8, 9) and idx - 8 < len(demos):
-        if not open_target(str(demos[idx - 8].get("open", ""))):
-            p.say("열지 못했어요", str(demos[idx - 8].get("open", ""))[:30])
+    elif idx in (8, 9) and len(demos) > 2 and held >= long_press:
+        pairs = (len(demos) + 1) // 2
+        p.demo_page = (p.demo_page % pairs + 1) % pairs
+        first = 2 * p.demo_page + 1
+        last = min(first + 1, len(demos))
+        p.say("시연 바로가기", f"{first}–{last} / 총 {len(demos)}개", 2)
+    elif idx in (8, 9) and demo_slots(p, demos)[idx - 8] < len(demos):
+        k = demo_slots(p, demos)[idx - 8]
+        if not open_target(str(demos[k].get("open", ""))):
+            p.say("열지 못했어요", str(demos[k].get("open", ""))[:30])
 
 
 def stop_and_upload(p: Presenter, on_uploaded=None) -> None:
