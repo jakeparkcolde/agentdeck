@@ -384,6 +384,10 @@ Google Flow와 Higgsfield는 남은 크레딧을 **웹 화면에서만** 보여�
     "worktree_globs": ["~/worktrees/*/*"]
   },
   "agy": {"enabled": true, "host": "studio"},
+  "shortcuts": {                // 홈 → 바로가기 페이지 (비우면 칸 없음). open = 주소·앱·파일
+    "title": "바로가기",
+    "items": [{"name": "Example", "sub": "short note", "open": "https://example.com"}]
+  },
   "market": {                   // 주식 히트맵
     "enabled": true,
     "portfolio": ["005930", "000660"],   // 종목코드

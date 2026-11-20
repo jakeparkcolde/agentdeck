@@ -71,6 +71,7 @@ PATTERNS: list[tuple[str, str]] = [
     (r"가동 (\d+)일", r"up \1d"),
     (r"(\d+)–(\d+) / 총 (\d+)개", r"\1–\2 of \3"),
     (r"(\d+)개 항목", r"\1 items"),
+    (r"(\d+)곳$", r"\1 links"),  # 바로가기 페이지 항목 수
     (r"(\d+)개", r"\1 items"),
     (r"(최고|시도) (\d+)번", r"\1 \2"),  # 게임 횟수
     (r"(\d+)코인 걸기", r"Bet \1"),
@@ -229,6 +230,8 @@ WORDS: list[tuple[str, str]] = sorted([
     ("키를 못 보냈어요", "Couldn't send key"), ("★ 중요 · Q 질문 표시를 쓸 수 있어요", "★ key · Q question marks ready"),
     ("녹음 시작", "Recording"), ("시작", "Start"), ("녹음 못 함", "Can't record"), ("마이크 권한을 확인하세요", "check microphone permission"),
     ("★ 중요 표시", "★ marked"), ("Q 질문 표시", "Q marked"), ("열지 못했어요", "Couldn't open"),
+    ("바로가기", "Shortcuts"), ("칸을 누르면 열려요", "tap a key to open"), (" · 여기: 다음 묶음", " · here: next set"),
+    ("열었어요", "Opened"),
     ("녹음 파일이 없어요", "No recording file"), ("agentnote 로 올리는 중…", "uploading to agentnote…"), ("녹음 끝", "Stopped"),
     ("강의 노트", "Lecture notes"), ("올리기 못 함", "Upload failed"), ("남음 예상", "Unused"),
     ("적정", "On track"), ("여유", "Ahead"), ("추천", "Best"), ("확인", "check"), ("취소", "Cancel"),

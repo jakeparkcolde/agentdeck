@@ -50,6 +50,12 @@
       {"name": "Demo site", "open": "https://example.com"}
     ]
   },
+  "shortcuts": {
+    "title": "바로가기",
+    "items": [
+      {"name": "Example", "sub": "short note", "open": "https://example.com"}
+    ]
+  },
   "market": {
     "enabled": true,
     "portfolio": [

@@ -102,6 +102,8 @@ Ten cells drain **from the last one backwards**. Blinks and sends a macOS notifi
 
 **Presentation mode** (Home → Present): slide ◀ ▶ (Keynote, PowerPoint, PDF, Google Slides), target-time timer (yellow at 5 min left, red when over), blank screen, lecture recording → [agentnote](https://github.com/jakeparkcolde/agentnote) lecture notes, ★ key-point and Q question marks, demo shortcuts (`presentation.demos` in `config.json`). With more than two demos, hold a demo key to show the next pair. macOS asks for Accessibility and microphone permission on first use.
 
+**Shortcuts page** (Home → Shortcuts): sites, apps and files listed in `shortcuts.items` in `config.json`, one per key, ten at a time (handy as a portfolio of sites you built). Press a key to open it; with more than ten, press the wide tile for the next ten. `shortcuts.title` renames the Home tile, and with an empty list no Home tile appears.
+
 <sub>→ [Guide: pomodoro](docs/GUIDE.en.md#45-pomodoro-page-5)</sub>
 
 </td>

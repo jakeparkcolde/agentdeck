@@ -31,6 +31,7 @@ import parcels_import
 import web_credits
 import updater
 import present
+import shortcuts
 import intro
 from sfx import ambient, play
 from fireplace import Fireplace
@@ -64,6 +65,7 @@ GAME_TICK = 0.05
 AQUA_FPS = 5
 WT_PAGE = 16  # 워크트리: 작업 현황 넓은 칸에서 들어가는 하위 페이지 (넘김 순서 밖)
 PRES_PAGE = 18  # 발표 모드: 홈 바로가기로 들어가는 하위 페이지 (넘김 순서 밖)
+SHORT_PAGE = 19  # 바로가기(포트폴리오): config.json 의 shortcuts 목록 (넘김 순서 밖)
 DEV_PAGE = 17  # 기기 상세: 머신 페이지에서 컴퓨터를 눌러 들어가는 하위 페이지
 WT_POLL_SEC = 60
 ARM_SEC = 10  # 길게 한 번 누른 뒤 확인 대기 시간
@@ -258,6 +260,11 @@ class Dashboard:
             present.press(self.pres, ev.index, held, LONG_PRESS, on_uploaded=lambda ok, text: self.render())
             self.pres_app = present.front_app() if ev.index in (0, 1, 2) else self.pres_app
             self.render()
+        elif self.page == SHORT_PAGE and ev.index in (10, 12):  # 바로가기 ◀ ▶ = 홈으로
+            self.go_page(HOME_PAGE)
+        elif self.page == SHORT_PAGE and (ev.index < 10 or ev.index >= 13):
+            if shortcuts.press(ev.index):
+                self.render()
         elif self.page in (1, 2) and held >= LONG_PRESS and self.login_llm(ev.index):
             # 로그인이 풀린 LLM 칸 길게: 터미널을 열어 사용자가 직접 로그인
             if remote_agy.via_collector:  # 수집기는 그 컴퓨터의 평소 로그인을 쓴다: SSH 로그인으로는 안 풀림
@@ -378,6 +385,8 @@ class Dashboard:
             items.append((PARCEL_PAGE, "택배", "도착 예상", "parcel", "#ff9e64"))
         items.append((AQUA_PAGE, "어항", "물멍 · 불멍 · 비 · 바다", "fish", "#7dcfff"))
         items.append((PRES_PAGE, "발표", "슬라이드 · 타이머 · 녹음", "bell", "#e0af68"))
+        if short := shortcuts.home_item(SHORT_PAGE):
+            items.append(short)
         items += self.home_extra
         if len(items) <= 10:
             return items
@@ -844,6 +853,16 @@ class Dashboard:
                     self.deck.set_buttons({**present.page(self.pres), **navs}, small_png=present.wide(self.pres, self.pres_app))
                 except Exception as e:
                     print(f"{datetime.now():%H:%M:%S} present render error: {e}", flush=True)
+            return
+        if self.page == SHORT_PAGE:
+            with self.render_lock:
+                navs = nav(self.page, PAGES, self.brightness, ("홈", "◀ ▶ 홈으로"))
+                navs[11] = Button(header=shortcuts.title(), title="홈", sub="◀ ▶ 홈으로", bg="#24283b", accent="#565f89",
+                                  raw_header=True)
+                try:
+                    self.deck.set_buttons({**shortcuts.page(), **navs}, small_png=shortcuts.wide())
+                except Exception as e:
+                    print(f"{datetime.now():%H:%M:%S} shortcuts render error: {e}", flush=True)
             return
         with self.render_lock:
             now = datetime.now(timezone.utc)

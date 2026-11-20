@@ -383,7 +383,11 @@ Everything lives in `config.json`. **Anything you leave out is turned off.** Res
     "lead_pane": "t1",          // lead pane that receives cleanup requests
     "worktree_globs": ["~/worktrees/*/*"]
   },
-  "agy": {"enabled": true, "host": "studio"}
+  "agy": {"enabled": true, "host": "studio"},
+  "shortcuts": {                // Home → Shortcuts page (empty = no tile). open = URL, app or file
+    "title": "Shortcuts",
+    "items": [{"name": "Example", "sub": "short note", "open": "https://example.com"}]
+  }
 }
 ```
 
