@@ -1,5 +1,8 @@
 {
   "ui_lang": "auto",
+  "device": {
+    "model": "d200"
+  },
   "agent_source": "hooks",
   "hooks": {
     "hosts": [

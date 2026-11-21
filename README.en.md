@@ -39,7 +39,8 @@ A macOS dashboard that drives the Ulanzi D200 directly, without the vendor app
 
 - **Ulanzi Stream Controller D200**: get it from the [Ulanzi official store on AliExpress](https://s.click.aliexpress.com/e/_c30mEPxl) (affiliate link¹), or pick **the cheapest or any seller you like** from the [AliExpress search results](https://www.aliexpress.com/w/wholesale-ulanzi-d200.html). There's also the [Ulanzi website](https://www.ulanzi.com/products/stream-deck-d200).
   - ¹ Affiliate link: if you buy through it, Coldbyte (who makes agentdeck) earns a small commission at no extra cost to you.
-  - ⚠️ Make sure the listing really is the **D200**. The similarly named **D200X** (with knobs) and **D200H** are different models and haven't been tested.
+  - ⚠️ Make sure the listing really is the **D200**. The similarly named **D200X** (with knobs) is a different model and hasn't been tested.
+  - The **D200H** works too: add `"device": {"model": "d200h"}` to `config.json` (it adjusts the wide tile size and input quirks).
 - macOS (Apple Silicon), Python 3.11+
 
 ## 🧩 Features

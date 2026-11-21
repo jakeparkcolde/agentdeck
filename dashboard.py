@@ -125,8 +125,10 @@ class LoggingPool(ThreadPoolExecutor):
 
 class Dashboard:
     def __init__(self) -> None:
-        self.deck = D200()
+        # 장치가 없어도 시작하고, 케이블을 뽑았다 꽂으면(다른 컴퓨터로 옮겼다 돌아와도) 이어서 그린다
+        self.deck = D200(reconnect=True)
         self.deck.on_event = self.on_event
+        self.deck.on_connect = self.on_reconnect
         self.pool = LoggingPool(max_workers=8)
         self.page = 1
         self.brightness_idx = 2
@@ -196,6 +198,13 @@ class Dashboard:
     @property
     def brightness(self) -> int:
         return BRIGHTNESS_STEPS[self.brightness_idx]
+
+    def on_reconnect(self) -> None:
+        """장치가 (다시) 연결됨: 누르던 칸 기록을 버리고 지금 화면을 새로 그린다."""
+        self.pressed_at.clear()
+        self.game_handled.clear()
+        self.last_input = time.time()  # 꽂자마자 화면보호기로 가지 않게
+        self.pool.submit(self.render)
 
     # ---- 입력 ----
     def on_event(self, ev: InputEvent) -> None:
@@ -1013,7 +1022,7 @@ class Dashboard:
                     self.render()
             self.fetch_now.clear()
         self.deck.close()
-        if self.deck.disconnected.is_set():
+        if self.deck.disconnected.is_set():  # reconnect=False 로 바꿨을 때만
             print(f"{datetime.now():%H:%M:%S} device disconnected, exiting", flush=True)
             raise SystemExit(1)  # launchd KeepAlive 가 재시작
 
