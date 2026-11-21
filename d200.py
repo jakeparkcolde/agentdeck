@@ -366,20 +366,40 @@ def find_device_path(devices: list[dict] | None = None) -> bytes | None:
     return best["path"]
 
 
-class D200:
-    """D200 / D200H 장치. profile 을 안 주면 config.json 의 "device" 항목으로 고른다."""
+RECONNECT_POLL_SEC = 2.0  # 장치가 없을 때 다시 찾는 간격
+RECONNECT_SETTLE_SEC = 1.0  # 다시 연 뒤 펌웨어가 준비될 때까지 기다렸다가 화면을 보낸다
 
-    def __init__(self, profile: DeviceProfile | None = None) -> None:
+
+def _log(msg: str) -> None:
+    print(f"{time.strftime('%H:%M:%S')} {msg}", flush=True)
+
+
+class D200:
+    """D200 / D200H 장치. profile 을 안 주면 config.json 의 "device" 항목으로 고른다.
+
+    reconnect=False (기본): 장치가 없으면 RuntimeError, 끊기면 disconnected 를 켜고 멈춘다 (기존 동작).
+    reconnect=True: 장치가 없어도 시작하고, 끊기면 기다렸다가 다시 연다. 다시 열면 밝기 · 작은 창 모드 ·
+                    마지막 화면을 복원하고 on_connect 를 부른다. 케이블을 다른 컴퓨터로 옮겼다 돌아와도 이어서 쓴다.
+                    끊겨 있는 동안의 화면 그리기는 건너뛴다.
+    """
+
+    def __init__(self, profile: DeviceProfile | None = None, reconnect: bool = False) -> None:
         self.profile = profile or load_profile()
-        path = find_device_path()
-        if not path:
-            raise RuntimeError(t("D200 을 찾지 못했어요 (USB 연결과 Ulanzi Studio 종료를 확인하세요)",
-                                 "D200 not found (check the USB cable and quit Ulanzi Studio)"))
-        self.dev = hid.device()
-        self.dev.open_path(path)
+        self.reconnect = reconnect
+        self.dev = None
         self._lock = threading.Lock()
         self._stop = threading.Event()
-        self.disconnected = threading.Event()
+        self.disconnected = threading.Event()  # reconnect=False 에서만 켜진다 (멈춤 신호)
+        self.connected = threading.Event()  # 지금 장치가 열려 있는지
+        self._brightness: int | None = None  # 다시 연결할 때 복원
+        self.on_connect: Callable[[], None] | None = None  # 읽기 스레드가 장치를 (다시) 열었을 때. 생성 때 바로 연 경우는 제외
+        self.on_disconnect: Callable[[], None] | None = None
+        if not self._open():
+            if not reconnect:
+                raise RuntimeError(t("D200 을 찾지 못했어요 (USB 연결과 Ulanzi Studio 종료를 확인하세요)",
+                                     "D200 not found (check the USB cable and quit Ulanzi Studio)"))
+            _log(t("장치를 기다리는 중이에요 (USB 연결과 Ulanzi Studio 종료를 확인하세요)",
+                   "waiting for the device (check the USB cable and quit Ulanzi Studio)"))
         self._small = "1|0|0|00:00:00|0"
         self._last_buttons: list[bytes] | None = None  # keepalive "buttons" 용 마지막 화면 패킷
         self._last_write = 0.0
@@ -389,20 +409,67 @@ class D200:
         self.on_event: Callable[[InputEvent], None] | None = None
         self.on_info: Callable[[str], None] | None = None
 
+    # ---- 연결 ----
+    def _open(self) -> bool:
+        """장치를 찾아 연다. 없거나 열 수 없으면 False."""
+        path = find_device_path()
+        if not path:
+            return False
+        dev = hid.device()
+        try:
+            dev.open_path(path)
+        except (OSError, ValueError):  # Ulanzi Studio 가 잡고 있거나 아직 준비 안 됨
+            return False
+        with self._lock:
+            self.dev = dev
+        self.connected.set()
+        return True
+
+    def _drop(self) -> None:
+        """끊긴 장치를 닫는다 (읽기 스레드에서만 부른다)."""
+        with self._lock:
+            dev, self.dev = self.dev, None
+        self.connected.clear()
+        if dev is not None:
+            try:
+                dev.close()
+            except (OSError, ValueError):
+                pass
+
+    def _restore_after_reconnect(self) -> None:
+        """다시 연 장치에 밝기 · 작은 창 모드 · 마지막 화면을 다시 보낸다."""
+        if self._stop.wait(RECONNECT_SETTLE_SEC):
+            return
+        if self._brightness is not None:
+            self.set_brightness(self._brightness)
+        if self.profile.small_window_cmd:
+            self.send(CMD_SMALL_WINDOW, self._small.encode())
+        self._resend_buttons()
+        if self.on_connect:
+            threading.Thread(target=self.on_connect, daemon=True).start()  # 읽기를 막지 않게
+
     # ---- 송신 ----
     def _write(self, packets: list[bytes], remember: bool = False) -> None:
         with self._lock:
-            for p in packets:
-                self.dev.write(b"\x00" + p)  # report ID 0 (번호 없는 리포트)
             if remember:
                 self._last_buttons = packets
+            if self.dev is None:  # 끊겨 있음: 다시 연결되면 마지막 화면을 보낸다
+                return
+            try:
+                for p in packets:
+                    self.dev.write(b"\x00" + p)  # report ID 0 (번호 없는 리포트)
+            except (OSError, ValueError):
+                if not self.reconnect:
+                    raise
+                return  # 끊김은 _read_loop 가 알아채고 다시 연다
             self._last_write = time.monotonic()
 
     def send(self, cmd: int, data: bytes) -> None:
         self._write([_frame(cmd, len(data), data)])
 
     def set_brightness(self, percent: int) -> None:
-        self.send(CMD_BRIGHTNESS, str(max(0, min(100, percent))).encode())
+        self._brightness = max(0, min(100, percent))
+        self.send(CMD_BRIGHTNESS, str(self._brightness).encode())
 
     def set_small_window(self, mode: int = 1, cpu: int = 0, mem: int = 0, gpu: int = 0) -> None:
         """mode: 0=CPU/RAM/GPU 통계, 1=아날로그 시계, 200~203=디지털 시계.
@@ -416,6 +483,8 @@ class D200:
             self.send(CMD_SMALL_WINDOW, self._small.encode())
 
     def set_buttons(self, buttons: dict[int, Button], partial: bool = False, small_png: bytes | None = None) -> None:
+        if self.dev is None and self.reconnect:
+            return  # 끊겨 있는 동안은 그리지 않는다 (애니메이션이 헛도는 CPU 를 아낌). 다시 연결되면 on_connect 에서 새로 그림
         p = self.profile
         payload = build_zip(buttons, small_png, p.wide_size, p.wide_action, p.wide_view_mode)
         partial = partial and self.profile.partial_updates
@@ -430,10 +499,15 @@ class D200:
     def _resend_buttons(self) -> None:
         # 기억한 패킷을 꺼내는 것과 보내는 것을 한 잠금 안에서 해서, 그 사이 새 화면이 나가도 옛 화면으로 덮지 않는다
         with self._lock:
-            if not self._last_buttons:
+            if not self._last_buttons or self.dev is None:
                 return
-            for p in self._last_buttons:
-                self.dev.write(b"\x00" + p)
+            try:
+                for p in self._last_buttons:
+                    self.dev.write(b"\x00" + p)
+            except (OSError, ValueError):
+                if not self.reconnect:
+                    raise
+                return
             self._last_write = time.monotonic()
 
     # ---- 수신 ----
@@ -480,13 +554,28 @@ class D200:
 
     def _read_loop(self) -> None:
         while not self._stop.is_set():
+            dev = self.dev
+            if dev is None:  # reconnect=True 에서만: 장치가 돌아올 때까지 찾는다
+                if self._stop.wait(RECONNECT_POLL_SEC):
+                    return
+                if self._open():
+                    _log(t("장치가 다시 연결됐어요", "device reconnected"))
+                    self._restore_after_reconnect()
+                continue
             try:
-                r = self.dev.read(PACKET, 100)
+                r = dev.read(PACKET, 100)
             except (OSError, ValueError):
-                # USB 분리 등: 끊김 표시 후 종료 (상위에서 프로세스를 끝내면 launchd 가 재시작)
-                self.disconnected.set()
-                self._stop.set()
-                return
+                self._drop()
+                if not self.reconnect:
+                    # 끊김 표시 후 종료 (상위에서 프로세스를 끝내면 launchd 가 재시작)
+                    self.disconnected.set()
+                    self._stop.set()
+                    return
+                _log(t("장치 연결이 끊겼어요. 다시 꽂히면 이어서 그려요",
+                       "device disconnected; will resume when it is plugged back in"))
+                if self.on_disconnect:
+                    self.on_disconnect()
+                continue
             if r:
                 self._parse(bytes(r))
 
@@ -511,7 +600,7 @@ class D200:
     def close(self) -> None:
         self._stop.set()
         time.sleep(0.2)
-        self.dev.close()
+        self._drop()
 
 
 if __name__ == "__main__":
@@ -521,10 +610,12 @@ if __name__ == "__main__":
     # 두 번째 인자부터 모델·설정을 바로 고를 수 있다:
     #   python d200.py 60 d200h
     #   python d200.py 60 d200h wide_width=458 wide_action=none small_window_cmd=true
-    extra = sys.argv[2:]
+    #   python d200.py 120 d200h reconnect      ← 실행 중 케이블을 뽑았다 꽂아 재연결 확인
+    extra = [a for a in sys.argv[2:] if a != "reconnect"]
+    reconnect = "reconnect" in sys.argv[2:]
     over = parse_overrides([a if "=" in a else f"model={a}" for a in extra])
-    deck = D200(load_profile(over) if extra else None)
-    print("PROFILE:", deck.profile, flush=True)
+    deck = D200(load_profile(over) if extra else None, reconnect=reconnect)
+    print("PROFILE:", deck.profile, "reconnect:", reconnect, flush=True)
     print("FONT:", FONT_PATH, flush=True)
     # 넓은 칸 확인용: 페이지들처럼 458x196 으로 그려 보내면 프로파일 크기로 맞춰진다.
     # 테두리 + 안쪽 눈금(가장자리에서 10·20px)으로 잘림 정도를 본다
@@ -554,6 +645,7 @@ if __name__ == "__main__":
 
     deck.on_event = handle
     deck.on_info = lambda s: print("DEVICE INFO:", s, flush=True)
+    deck.on_connect = lambda: deck.set_buttons(buttons, small_png=wide_png)  # 장치 없이 시작했을 때를 위해 새로 그림
     deck.debug_raw = True
     deck.start()
     deck.set_brightness(80)
