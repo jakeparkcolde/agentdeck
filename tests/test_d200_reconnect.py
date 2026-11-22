@@ -152,6 +152,35 @@ class ReconnectTest(unittest.TestCase):
         self.assertIn(d200.CMD_SET_BUTTONS, cmds)  # 마지막 화면을 바로 다시 보낸다
         self.assertTrue(deck.connected.is_set())
 
+    def test_unplug_and_replug_revives_stuck_device_and_restores_screen(self):
+        revive = self.enterContext(mock.patch.object(d200, "revive_stuck_device", return_value=True))
+        clock = mock.Mock(wraps=time)
+        clock.sleep.return_value = None
+        self.enterContext(mock.patch.object(d200, "time", clock))
+        deck = self.make(reconnect=True)
+        hid_info = d200._find_hid()
+        connected = threading.Event()
+        deck.on_connect = connected.set
+        deck.on_disconnect = self.hub.plug
+        deck.set_brightness(80)
+        deck.set_small_window(d200.SMALL_BACKGROUND)
+        deck.set_buttons(self.screen)
+        self.hub.clear()
+
+        self.hub.unplug()
+        find_hid = self.enterContext(mock.patch.object(d200, "_find_hid", side_effect=[None, hid_info]))
+        deck.start()
+
+        self.assertTrue(connected.wait(3), "on_connect not called after reviving stuck device")
+        self.assertTrue(deck.connected.is_set())
+        revive.assert_called_once_with()
+        clock.sleep.assert_called_once_with(0.5)
+        self.assertEqual(find_hid.call_count, 2)
+        cmds = self.hub.cmds()
+        self.assertIn(d200.CMD_BRIGHTNESS, cmds)
+        self.assertIn(d200.CMD_SMALL_WINDOW, cmds)
+        self.assertIn(d200.CMD_SET_BUTTONS, cmds)
+
     def test_repeated_switching(self):
         deck = self.make(reconnect=True)
         count = []

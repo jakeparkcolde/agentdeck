@@ -403,6 +403,8 @@ class Dashboard:
         return items[9:] + [back] if self.home_more else items[:9] + [more]
 
     def render_home(self) -> None:
+        if not self.deck.connected.is_set():
+            return
         if self.home_pick:  # 물멍 / 불멍 고르기: 세로 두 칸짜리 큰 단추 두 개
             body = {i: Button(bg="#101118") for i in range(10)}
             for col, (title, sub, icon, color) in ((0, ("물멍", "어항 · 물소리", "fish", "#7dcfff")),
@@ -440,6 +442,9 @@ class Dashboard:
 
     def play_intro(self) -> None:
         """켜질 때 약 3초 인트로 → 홈. 아무 칸이나 누르면 건너뜀."""
+        if not self.deck.connected.is_set():
+            self.page = HOME_PAGE
+            return
         self.home_notes, self.home_fresh = intro.whats_new(), intro.is_new()
         self.intro_on, self.intro_skip = True, False
         sub = intro.version_text()
@@ -845,6 +850,8 @@ class Dashboard:
         return chips
 
     def render(self) -> None:
+        if not self.deck.connected.is_set():
+            return
         if self.intro_on:
             return
         if self.page == HOME_PAGE:
