@@ -7,6 +7,7 @@ from datetime import datetime
 
 from PIL import Image, ImageDraw, ImageFont
 
+import platform_compat
 from i18n import tr
 
 
@@ -20,23 +21,19 @@ class _Draw(ImageDraw.ImageDraw):
         return super().textlength(tr(text), *args, **kwargs)
 
 W, H = 458, 196
-SF_ROUNDED = "/System/Library/Fonts/SFNSRounded.ttf"
-KR = "/System/Library/Fonts/AppleSDGothicNeo.ttc"
 WEEKDAYS = ["월요일", "화요일", "수요일", "목요일", "금요일", "토요일", "일요일"]
+# _kr 의 index 는 macOS Apple SD Gothic Neo(.ttc) 안의 굵기 번호. 다른 OS 에선 같은 굵기의 글꼴로 바꾼다
+_KR_WEIGHT = {0: "regular", 2: "medium", 4: "semibold", 6: "bold", 8: "light"}
 
 
 def _sf(size: int, weight: bytes = b"Semibold") -> ImageFont.FreeTypeFont:
-    f = ImageFont.truetype(SF_ROUNDED, size)
-    try:
-        f.set_variation_by_name(weight)
-    except Exception:
-        pass
-    return f
+    """큰 숫자용 둥근 글꼴 (macOS SF Rounded, Windows Segoe UI)."""
+    return platform_compat.truetype("rounded", size, weight.decode().lower())
 
 
 def _kr(size: int, index: int) -> ImageFont.FreeTypeFont:
     # index: 0 Regular, 2 Medium, 4 SemiBold, 6 Bold, 8 Light
-    return ImageFont.truetype(KR, size, index=index)
+    return platform_compat.truetype("kr", size, _KR_WEIGHT.get(index, "regular"))
 
 
 def render_clock(now: datetime | None = None, status: list[tuple[str, str]] | None = None) -> bytes:

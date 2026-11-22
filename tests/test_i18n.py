@@ -37,7 +37,7 @@ def call_name(node):
 
 class Scan:
     def __init__(self, path):
-        self.src = (ROOT / path).read_text()
+        self.src = (ROOT / path).read_text(encoding="utf-8")  # Windows 기본 인코딩(cp949)에서도 읽히게
         self.lines = self.src.splitlines()
         self.tree = ast.parse(self.src)
         self.parent = {c: p for p in ast.walk(self.tree) for c in ast.iter_child_nodes(p)}

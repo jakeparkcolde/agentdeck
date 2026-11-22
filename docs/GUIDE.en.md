@@ -87,6 +87,43 @@ It now starts at login and restarts within 15 seconds if it stops. Unplugging an
 | Restart after editing the config | `launchctl kickstart -k gui/$(id -u)/com.agentdeck.dashboard` |
 | Watch the log | `tail -f dashboard.log` |
 
+### 2-5. Using it on Windows
+
+agentdeck also runs on Windows 10/11 (verified with a D200H). You can share one device between a Mac and a Windows PC **just by moving the cable**: each computer runs its own agentdeck and reconnects when the device is plugged in.
+
+In PowerShell:
+
+```powershell
+git clone https://github.com/jakeparkcolde/agentdeck.git
+cd agentdeck
+py -3 -m venv .venv
+.venv\Scripts\pip install -r requirements.txt
+copy config.example.json config.json
+.venv\Scripts\python dashboard.py
+```
+
+| To do this | Run |
+|---|---|
+| Install agent hooks + the Claude quota statusline | `.venv\Scripts\python scripts\install-hooks.py --codex --statusline` |
+| Start automatically at logon (Task Scheduler) | `.\scripts\install-task.ps1 -Start` |
+| Remove autostart | `.\scripts\install-task.ps1 -Uninstall` |
+| Watch the log | `Get-Content $HOME\.cache\d200\dashboard.log -Wait` |
+
+- **Hooks:** on Windows they are registered without a shell (`command` + `args`). Without Git Bash, Claude Code runs hooks through PowerShell, where a one-line quoted command can break.
+- **Claude quota:** bash may be missing, so the Python version `hooks/statusline_tee.py` is used instead of `statusline-tee.sh`. An existing statusline is left unchanged.
+- **Autostart:** registered as a logon task, not a service (services run in a session that cannot open USB devices). It runs without a window and restarts a minute after a crash.
+
+What differs on Windows:
+
+| Feature | Windows |
+|---|---|
+| Fonts | Malgun Gothic · Segoe UI · Segoe UI Emoji |
+| Screen language (`"ui_lang": "auto"`) | Windows display language |
+| Pressing an agent tile | VS Code · Cursor open that project window; anything else (Windows Terminal, …) brings the session's app window to the front |
+| Machines page | This PC's CPU · memory · disk (remote Macs over SSH as before) |
+| Pomodoro alert | Notification Center toast + sound |
+| Still macOS only | Sound effects, Herdr, presentation mode (slide keys · recording), Mole cleanup, opening the heatmap tab |
+
 ## 3. Screen basics
 
 ```

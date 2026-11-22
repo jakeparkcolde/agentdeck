@@ -87,6 +87,43 @@ cp config.example.json config.json
 | 설정을 바꾼 뒤 다시 시작 | `launchctl kickstart -k gui/$(id -u)/com.agentdeck.dashboard` |
 | 로그 보기 | `tail -f dashboard.log` |
 
+### 2-5. Windows에서 쓰기
+
+Windows 10/11에서도 돌아가요 (D200H로 확인). 같은 장치를 맥과 Windows에 **케이블만 옮겨 꽂아** 번갈아 쓸 수 있어요. 컴퓨터마다 agentdeck이 따로 돌고, 장치가 꽂히면 알아서 다시 연결합니다.
+
+PowerShell에서:
+
+```powershell
+git clone https://github.com/jakeparkcolde/agentdeck.git
+cd agentdeck
+py -3 -m venv .venv
+.venv\Scripts\pip install -r requirements.txt
+copy config.example.json config.json
+.venv\Scripts\python dashboard.py
+```
+
+| 하고 싶은 일 | 명령 |
+|---|---|
+| 에이전트 훅 + Claude 한도 statusline 설치 | `.venv\Scripts\python scripts\install-hooks.py --codex --statusline` |
+| 로그온할 때 자동 실행 (작업 스케줄러) | `.\scripts\install-task.ps1 -Start` |
+| 자동 실행 제거 | `.\scripts\install-task.ps1 -Uninstall` |
+| 로그 보기 | `Get-Content $HOME\.cache\d200\dashboard.log -Wait` |
+
+- **훅:** Windows에서는 셸을 거치지 않는 형식(`command` + `args`)으로 등록해요. Git Bash가 없으면 Claude Code가 훅을 PowerShell로 돌리는데, 한 줄 명령은 따옴표 때문에 깨질 수 있어서예요.
+- **Claude 한도:** bash가 없을 수 있어서 `statusline-tee.sh` 대신 Python 판 `hooks/statusline_tee.py`를 써요. 이미 다른 statusline이 있으면 바꾸지 않아요.
+- **자동 실행:** 서비스가 아니라 로그온 작업으로 등록해요 (서비스는 USB 장치를 열 수 없는 세션에서 돌아요). 창 없이 돌고, 죽으면 1분 뒤 다시 켜져요.
+
+Windows에서 달라지는 점:
+
+| 기능 | Windows |
+|---|---|
+| 글꼴 | 맑은 고딕 · Segoe UI · Segoe UI Emoji |
+| 화면 언어 (`"ui_lang": "auto"`) | Windows 표시 언어 |
+| 작업 현황 칸 누르기 | VS Code · Cursor는 그 프로젝트 창, 그 밖(Windows Terminal 등)은 세션이 도는 앱 창을 앞으로 |
+| 머신 페이지 | 이 PC의 CPU · 메모리 · 디스크 (원격 맥은 지금처럼 SSH) |
+| 뽀모도로 알림 | 알림 센터 토스트 + 알림음 |
+| 아직 맥에서만 | 효과음, Herdr 연동, 발표 모드(슬라이드 넘기기 · 녹음), Mole 정리, 히트맵 탭 열기 |
+
 ## 3. 화면 기본 사용법
 
 ```

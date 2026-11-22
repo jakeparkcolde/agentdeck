@@ -24,6 +24,7 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw
 
+import platform_compat
 from clock import _Draw, _kr
 
 try:  # python.org 파이썬은 인증서 묶음이 없어서 certifi 를 쓴다 (market.py 와 같은 방식)
@@ -256,7 +257,7 @@ def grouped(ps: list[Parcel]) -> list[Parcel]:
 
 def open_tracking(p: Parcel) -> None:
     url = ALI_TRACK_URL.format(id=p.order_no) if p.order_no else TRACK_URL.format(no=p.tracking)
-    subprocess.Popen(["open", url])
+    platform_compat.open_target(url)
 
 
 # ---------- 그리기 ----------

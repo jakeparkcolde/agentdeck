@@ -16,6 +16,7 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
 
+import platform_compat
 from clock import _Draw, _kr, _sf
 
 ROOT = Path(__file__).parent
@@ -159,7 +160,7 @@ def version_text() -> str:
 
 
 # ---------- 홈 (바로가기) ----------
-EMOJI_FONT = "/System/Library/Fonts/Apple Color Emoji.ttc"
+EMOJI_FONT = platform_compat.font_file("emoji")[0]  # macOS Apple Color Emoji, Windows Segoe UI Emoji
 
 
 @lru_cache(maxsize=32)

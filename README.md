@@ -42,6 +42,7 @@ Ulanzi D200을 공식 앱 없이 직접 제어하는 macOS 대시보드
   - ⚠️ 상품명에 **D200**이 맞는지 꼭 확인하세요. 이름이 비슷한 **D200X**(노브 포함)는 다른 모델이라 동작을 확인하지 않았어요.
   - **D200H**도 쓸 수 있어요. `config.json`에 `"device": {"model": "d200h"}`를 넣으세요 (넓은 칸 크기·입력 차이를 맞춰요).
 - macOS(Apple Silicon), Python 3.11 이상
+  - **Windows 10/11**에서도 돌아가요 → [가이드: Windows에서 쓰기](docs/GUIDE.md#2-5-windows에서-쓰기)
 
 ## 🧩 기능
 

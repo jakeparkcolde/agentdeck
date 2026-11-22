@@ -42,6 +42,7 @@
   - ⚠️ 商品が本当に **D200** かどうか確認してください。名前の似た **D200X**（ノブ付き）は別モデルで、動作確認していません。
   - **D200H** も使えます。`config.json` に `"device": {"model": "d200h"}` を追加してください（ワイドタイルのサイズと入力の違いを合わせます）。
 - macOS（Apple Silicon）、Python 3.11+
+  - **Windows 10/11** でも動きます → [Guide: Using it on Windows](docs/GUIDE.en.md#2-5-using-it-on-windows)
 
 ## 🧩 機能
 

@@ -14,31 +14,54 @@ import os
 import socket
 import subprocess
 
+import platform_compat
 from remote_herdr import StudioState, Workspace
 
 AGENTS_DIR = "~/.cache/d200/agents"
 STALE_SEC = 24 * 3600
 
 # 원격(또는 로컬)에서 실행: 살아 있는 세션만 JSON 목록으로 출력, 죽은 세션 파일은 삭제
+# (원격에서도 돌아서 platform_compat 를 못 쓴다. Windows 에서 os.kill(pid, 0) 은 그 프로세스를 강제 종료하므로
+#  Windows 는 OpenProcess 로 확인한다 — platform_compat.pid_alive 와 같은 방법)
 SCAN = r'''
 import glob, json, os, time
+def alive(pid):
+    if os.name == "nt":
+        if pid <= 0:
+            return False
+        import ctypes
+        k = ctypes.windll.kernel32
+        h = k.OpenProcess(0x1000, False, pid)
+        if not h:
+            return False
+        code = ctypes.c_ulong()
+        ok = k.GetExitCodeProcess(h, ctypes.byref(code))
+        k.CloseHandle(h)
+        return bool(ok) and code.value == 259
+    try:
+        os.kill(pid, 0)
+        return True
+    except Exception:
+        return False
 out = []
+for p in glob.glob(os.path.expanduser("%s/*.json.*")):  # 훅이 덮어쓰다 남긴 임시 파일 (1분 지나면 버려진 것)
+    try:
+        if time.time() - os.path.getmtime(p) > 60:
+            os.remove(p)
+    except Exception:
+        pass
 for p in glob.glob(os.path.expanduser("%s/*.json")):
     try:
-        d = json.load(open(p))
-        alive = True
-        try:
-            os.kill(int(d.get("pid") or 0), 0)
-        except Exception:
-            alive = False
-        if not alive or time.time() - d.get("updated", 0) > %d:
+        with open(p) as f:  # 바로 닫는다: 열려 있는 동안엔 Windows 에서 훅이 덮어쓰지 못한다
+            d = json.load(f)
+        if not alive(int(d.get("pid") or 0)) or time.time() - d.get("updated", 0) > %d:
             os.remove(p)
             continue
         out.append(d)
     except Exception:
         pass
 print(json.dumps(out))
-''' % (AGENTS_DIR, STALE_SEC)
+''' % (AGENTS_DIR, AGENTS_DIR, STALE_SEC)
 
 # 세션 정보 (term id → 기록) : 눌렀을 때 이동에 쓴다
 _sessions: dict[str, dict] = {}
@@ -46,7 +69,7 @@ LOCAL_HOST = socket.gethostname().split(".")[0]
 
 
 def _scan(host: str | None) -> list[dict]:
-    cmd = ["python3", "-"] if host is None else \
+    cmd = platform_compat.python_cmd() + ["-"] if host is None else \
         ["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=5", host, "python3", "-"]
     try:
         r = subprocess.run(cmd, input=SCAN, capture_output=True, text=True, timeout=15)
@@ -87,6 +110,8 @@ def focus_session(term: str) -> bool:
         return False
     if d.get("_ssh") is not None:
         return False  # 다른 맥에서 도는 세션: 이 맥에서 창을 띄울 수 없음
+    if d.get("platform") == "win32":
+        return _focus_windows(d)
     bundle, tty, cwd = d.get("bundle", ""), d.get("tty", ""), d.get("cwd", "")
     dev = f"/dev/{tty}" if tty and tty not in ("??", "-") else ""
     if bundle == "com.googlecode.iterm2" and dev:
@@ -128,6 +153,14 @@ end tell''')
         subprocess.run(["open", "-b", bundle], timeout=10)  # 앱만 앞으로 (Ghostty, Herdr 등)
         return True
     return False
+
+
+def _focus_windows(d: dict) -> bool:
+    """Windows: VS Code · Cursor 는 그 프로젝트 창을 열고, 그 밖(Windows Terminal 등)은 세션이 도는 앱 창을 앞으로."""
+    app, cwd, app_pid = d.get("app", ""), d.get("cwd", ""), int(d.get("app_pid") or 0)
+    if app in ("code", "cursor") and cwd and platform_compat.run_cli(app, cwd):
+        return True
+    return platform_compat.activate_pid(app_pid)
 
 
 def focus(ws: Workspace, step: int = 0) -> bool:

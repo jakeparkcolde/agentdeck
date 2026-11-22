@@ -42,6 +42,7 @@
   - ⚠️ 请确认商品确实是 **D200**。名字相近的 **D200X**（带旋钮）是不同型号，尚未测试。
   - **D200H** 也可以使用：在 `config.json` 中加入 `"device": {"model": "d200h"}`（会调整宽格尺寸和输入差异）。
 - macOS（Apple Silicon）、Python 3.11+
+  - 也支持 **Windows 10/11** → [Guide: Using it on Windows](docs/GUIDE.en.md#2-5-using-it-on-windows)
 
 ## 🧩 功能
 
