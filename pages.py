@@ -41,6 +41,8 @@ class LLM:
     week: Limit | None = None
     extra: str = ""  # 예: 크레딧
     login: bool = False  # 로그인이 풀려 한도를 못 읽는 상태 (칸을 길게 누르면 로그인 창)
+    bars: list[tuple] | None = None
+    week_note: str = ""
 
     def binding(self) -> Limit | None:
         """더 빡빡한(남은 게 적은) 창."""
@@ -167,24 +169,19 @@ def llm_tile(m: LLM, now: datetime | None = None) -> Button:
         return login_tile(m.name)
     b = m.binding()
     warn = warn_color(llm_forecast(m, now)) if now else None
+    bars = m.bars
+    if bars is None:
+        five = m.five.remaining if m.five else None
+        week = m.week.remaining if m.week else None
+        bars = [("5H", five, color_for(five)), ("주간", week, color_for(week))]
     return Button(
         header=m.name,
-        title=pct(b.remaining if b else None),
-        bg=BG,
-        accent=m.color,
-        bars=[
-            ("5H", m.five.remaining if m.five else None, color_for(m.five.remaining if m.five else None)),
-            ("주간", m.week.remaining if m.week else None, color_for(m.week.remaining if m.week else None)),
-        ],
-        border=RED if b and b.remaining is not None and b.remaining < 0.15 else warn,
+        title="" if m.bars is not None else pct(b.remaining if b else None),
+        bg=WARN_TINT[warn] if warn else BG,
+        accent=warn or m.color,
+        bars=bars,
+        border=warn or (RED if b and b.remaining is not None and b.remaining < 0.15 else None),
         sub=f"리셋 {until(b.reset)}" if b else "",
-    ) if not warn else Button(  # 경고: 어두운 경고색 바탕 + 경고색 테두리 (막대는 그대로 보이게)
-        header=m.name, title=pct(b.remaining if b else None), bg=WARN_TINT[warn], accent=warn,
-        bars=[
-            ("5H", m.five.remaining if m.five else None, color_for(m.five.remaining if m.five else None)),
-            ("주간", m.week.remaining if m.week else None, color_for(m.week.remaining if m.week else None)),
-        ],
-        border=warn, sub=f"리셋 {until(b.reset)}" if b else "",
     )
 
 
@@ -277,8 +274,11 @@ def page_grid(llms: list[LLM], now: datetime, credits: list[tuple[str, str, dict
                 p[idx] = Button(header=f"{m.name.split()[0]} {label}", title="-", sub="없음", bg=BG, accent=m.color)
             else:
                 fc = forecast(lim, now, waste=attr == "week")  # 5H 는 금방 리셋되니 "다 못 씀"은 안 봄
+                sub = forecast_text(fc) if fc else f"리셋 {until(lim.reset, now)}"
+                if attr == "week" and m.week_note:
+                    sub = f"{m.week_note} · {sub}"
                 p[idx] = warn_fill(Button(header=f"{m.name.split()[0]} {label}", title=pct(lim.remaining),
-                                          sub=forecast_text(fc) if fc else f"리셋 {until(lim.reset, now)}", bg=BG,
+                                          sub=sub, bg=BG,
                                           accent=m.color, ratio=lim.remaining), fc)
                 p[idx].accent = m.color
     return p

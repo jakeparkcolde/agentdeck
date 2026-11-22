@@ -10,9 +10,12 @@ from __future__ import annotations
 import glob
 import json
 import os
+import subprocess
 import time
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
+
+import config
 
 HOME = os.path.expanduser("~")
 CLAUDE_GLOB = f"{HOME}/.claude/projects/**/*.jsonl"
@@ -60,6 +63,7 @@ class CodexUsage:
 
 # 파일별 파싱 결과 캐시: path -> (mtime, size, records)
 _cache: dict[str, tuple[float, int, list]] = {}
+_remote_claude_cache: dict[str, tuple[float, dict | None]] = {}
 
 
 def _recent_files(pattern: str) -> list[str]:
@@ -112,17 +116,56 @@ def _window(raw: dict | None, pct_key: str, reset_key: str) -> Window:
     pct = raw.get(pct_key)
     reset = raw.get(reset_key)
     reset_dt = None
-    if isinstance(reset, (int, float)):
-        reset_dt = datetime.fromtimestamp(reset, timezone.utc)
-    elif isinstance(reset, str):
-        try:
+    try:
+        if isinstance(reset, (int, float)):
+            reset_dt = datetime.fromtimestamp(reset, timezone.utc)
+        elif isinstance(reset, str):
             reset_dt = _ts(reset)
-        except ValueError:
-            pass
-    return Window(float(pct) if pct is not None else None, reset_dt)
+            if reset_dt.tzinfo is None:
+                reset_dt = reset_dt.replace(tzinfo=timezone.utc)
+    except (OSError, OverflowError, ValueError):
+        pass
+    try:
+        return Window(float(pct) if pct is not None else None, reset_dt)
+    except (OverflowError, TypeError, ValueError):
+        return Window()
 
 
-def claude_usage(now: datetime | None = None) -> ClaudeUsage:
+def pick_fresher_window(a: Window, b: Window, now: datetime) -> Window:
+    """Prefer active windows, then the latest known reset, then higher usage."""
+    active = [w for w in (a, b)
+              if w.used_percent is not None and (w.resets_at is None or w.resets_at > now)]
+    return max(active, key=lambda w: (w.resets_at is not None, w.resets_at or datetime.min.replace(tzinfo=timezone.utc), w.used_percent),
+               default=Window())
+
+
+def _read_claude_status(host: str | None) -> dict | None:
+    if host is not None:
+        cached = _remote_claude_cache.get(host)
+        if cached is not None and time.monotonic() - cached[0] < 25:
+            return cached[1]
+
+    try:
+        if host is None:
+            with open(CLAUDE_STATUS, encoding="utf-8") as fp:
+                snap = json.load(fp)
+        else:
+            result = subprocess.run(
+                ["ssh", "-T", "-o", "BatchMode=yes", "-o", "ConnectTimeout=5", host,
+                 "cat", "~/.cache/d200/claude_status.json"],
+                capture_output=True, text=True, timeout=10, check=True,
+            )
+            snap = json.loads(result.stdout)
+        snap = snap if isinstance(snap, dict) else None
+    except (OSError, ValueError, subprocess.SubprocessError):
+        snap = None
+
+    if host is not None:
+        _remote_claude_cache[host] = (time.monotonic(), snap)
+    return snap
+
+
+def claude_usage(now: datetime | None = None, hosts: list[str | None] | None = None) -> ClaudeUsage:
     now = now or datetime.now(timezone.utc)
     local_midnight = datetime.now().astimezone().replace(hour=0, minute=0, second=0, microsecond=0)
     week_start = now - timedelta(days=7)
@@ -165,14 +208,16 @@ def claude_usage(now: datetime | None = None) -> ClaudeUsage:
         u.block_tokens = block_tokens
         u.block_end = block_start + BLOCK
 
-    # statusline 스냅샷(있으면)에서 공식 한도 사용률
-    try:
-        snap = json.load(open(CLAUDE_STATUS))
-        rl = snap.get("rate_limits") or {}
-        u.five_hour = _window(rl.get("five_hour"), "used_percentage", "resets_at")
-        u.seven_day = _window(rl.get("seven_day"), "used_percentage", "resets_at")
-    except (OSError, ValueError):
-        pass
+    # statusline 스냅샷의 공식 한도 사용률을 창별로 병합한다.
+    for host in config.CLAUDE_HOSTS if hosts is None else hosts:
+        snap = _read_claude_status(host)
+        rl = (snap or {}).get("rate_limits")
+        if not isinstance(rl, dict):
+            continue
+        five_hour = _window(rl.get("five_hour"), "used_percentage", "resets_at")
+        seven_day = _window(rl.get("seven_day"), "used_percentage", "resets_at")
+        u.five_hour = pick_fresher_window(u.five_hour, five_hour, now)
+        u.seven_day = pick_fresher_window(u.seven_day, seven_day, now)
     return u
 
 

@@ -45,3 +45,14 @@ HOOK_HOSTS: list[str | None] = (CFG.get("hooks") or {}).get("hosts", [None])
 # agy(Antigravity CLI) 할당량: 이 CLI 를 쓰는 컴퓨터의 ssh 대상
 AGY: dict = CFG.get("agy") or {}
 AGY_HOST: str | None = AGY.get("host") if AGY.get("enabled") else None
+
+# Claude statusline 스냅샷: null = 이 맥, 그 외 ssh 대상
+CLAUDE_CFG: dict = CFG.get("claude") or {}
+CLAUDE_HOSTS: list[str | None]
+if isinstance(CLAUDE_CFG.get("hosts"), list):
+    CLAUDE_HOSTS = CLAUDE_CFG["hosts"]
+elif CLAUDE_CFG.get("host"):
+    CLAUDE_HOSTS = [None, CLAUDE_CFG["host"]]
+else:
+    remote_hosts = (STUDIO_HOST if STUDIO_ENABLED else None, AGY_HOST)
+    CLAUDE_HOSTS = [None, *dict.fromkeys(host for host in remote_hosts if host)]

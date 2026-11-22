@@ -78,3 +78,54 @@ class DashboardQuotaTests(unittest.TestCase):
         self.assertEqual((grid[2].title, grid[7].sub), ("로그인", "길게: 로그인"))
         with patch.object(self.dashboard.remote_agy, "login_needed", False):
             self.assertFalse(self.collect(None)[2].login)
+
+    def test_two_weekly_groups_show_separate_bars_and_recommend_primary(self):
+        from io import BytesIO
+
+        from PIL import Image
+
+        from d200 import ICON, render_icon
+        from remote_herdr import StudioState
+
+        payload = {"status": "SUCCESS", "command": {"data": {"groups": [
+            {"name": "Gemini Models", "buckets": [
+                {"window": "5h", "remaining_fraction": .86},
+                {"window": "weekly", "remaining_fraction": .83}]},
+            {"name": "Claude and GPT models", "buckets": [
+                {"window": "5h", "remaining_fraction": 0, "disabled": True},
+                {"window": "weekly", "remaining_fraction": 0}]},
+        ]}}}
+        now = datetime(2030, 1, 1, tzinfo=timezone.utc)
+        llms = self.collect(remote_agy.parse_quota(payload))
+        agy = llms[2]
+        self.assertEqual((agy.week.remaining, agy.five.remaining), (.83, .86))
+        self.assertEqual(agy.bars, [
+            ("5H", .86, self.pages.GREEN, "86%"),
+            ("GEM", .83, self.pages.GREEN, "83%"),
+            ("3P", 0, self.pages.RED, "0%"),
+        ])
+        tile = self.pages.llm_tile(agy, now)
+        self.assertEqual((tile.title, tile.bars), ("", agy.bars))
+        with Image.open(BytesIO(render_icon(tile))) as icon:
+            self.assertEqual((icon.format, icon.size), ("PNG", (ICON, ICON)))
+            icon.verify()
+
+        week = self.pages.page_grid(llms, now)[7]
+        self.assertEqual((week.header, week.title), ("AGY 주간", "83%"))
+        self.assertIn("3P 0%", week.sub)
+        recommendation = self.pages.page_summary(llms, StudioState(False, []), now)[3]
+        self.assertEqual((recommendation.header, recommendation.title, recommendation.sub),
+                         ("지금 쓰기 좋은", "AGY", "여유 83%"))
+
+    def test_gemini_wins_tie_and_uses_tightest_fallbacks(self):
+        buckets = [
+            remote_agy.Bucket("Other Models", "weekly", .83, None),
+            remote_agy.Bucket("Other Models", "5h", .4, None),
+            remote_agy.Bucket("Gemini Models", "weekly", .83, None),
+            remote_agy.Bucket("GPT Models", "weekly", .2, None),
+            remote_agy.Bucket("GPT Models", "5h", .3, None),
+        ]
+        agy = self.collect(buckets)[2]
+        self.assertEqual((agy.week.remaining, agy.five.remaining), (.83, .3))
+        self.assertEqual([bar[0] for bar in agy.bars], ["5H", "GEM", "3P"])
+        self.assertEqual(agy.week_note, "3P 20%")
