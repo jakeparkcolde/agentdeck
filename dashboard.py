@@ -16,7 +16,8 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 
 from clock import render_clock, render_market, render_message, render_timer, render_worktree_summary
-from d200 import D200, SMALL_BACKGROUND, Button, InputEvent
+from d200 import SMALL_BACKGROUND, Button, InputEvent
+from drivers import open_deck
 from machines import MachineStat, machine_stats
 from pages import (LLM, Limit, nav, nav_device, nav_worktrees, page_device, page_grid, page_machines, page_pomodoro,
                    page_market, page_studio, page_summary, page_worktrees)
@@ -128,7 +129,7 @@ class LoggingPool(ThreadPoolExecutor):
 class Dashboard:
     def __init__(self) -> None:
         # 장치가 없어도 시작하고, 케이블을 뽑았다 꽂으면(다른 컴퓨터로 옮겼다 돌아와도) 이어서 그린다
-        self.deck = D200(reconnect=True)
+        self.deck = open_deck(reconnect=True)
         self.deck.on_event = self.on_event
         self.deck.on_connect = self.on_reconnect
         self.pool = LoggingPool(max_workers=8)
