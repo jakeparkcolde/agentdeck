@@ -31,7 +31,7 @@ You don't have to turn everything on. **LLM quotas and the pomodoro work right a
 
 | Item | Notes |
 |---|---|
-| **Ulanzi Stream Controller D200** | 13 keys plus one wide screen tile. Pick **the cheapest or any seller you like** from the [AliExpress search results](https://www.aliexpress.com/w/wholesale-ulanzi-d200.html); there's also the [Ulanzi store](https://www.ulanzi.com/products/stream-deck-d200). ⚠️ The similarly named **D200X** (with knobs) and **D200H** are different models and have not been tested. Make sure the listing says just **D200**. |
+| **Ulanzi Stream Controller D200** | 13 keys plus one wide screen tile. Pick **the cheapest or any seller you like** from the [AliExpress search results](https://www.aliexpress.com/w/wholesale-ulanzi-d200.html); there's also the [Ulanzi store](https://www.ulanzi.com/products/stream-deck-d200). ⚠️ The similarly named **D200X** (with knobs) is a different model and has not been tested. The **D200H** works if you add `"device": {"model": "d200h"}` to `config.json`. |
 | **A Mac** | Tested on Apple Silicon. |
 | **USB cable** | Plug the included USB-C cable straight into your Mac. |
 

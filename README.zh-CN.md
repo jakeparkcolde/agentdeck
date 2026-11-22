@@ -39,7 +39,8 @@
 
 - **Ulanzi Stream Controller D200**：可以在 [AliExpress 的 Ulanzi 官方店](https://s.click.aliexpress.com/e/_c30mEPxl)（推广链接¹）购买，也可以在 [AliExpress 搜索结果](https://www.aliexpress.com/w/wholesale-ulanzi-d200.html) 里 **挑最便宜的或你喜欢的卖家**。也可以去 [Ulanzi 官网](https://www.ulanzi.com/products/stream-deck-d200)。
   - ¹ 推广链接：通过此链接购买，制作 agentdeck 的 Coldbyte 会获得少量佣金，价格不变。
-  - ⚠️ 请确认商品确实是 **D200**。名字相近的 **D200X**（带旋钮）和 **D200H** 是不同型号，尚未测试。
+  - ⚠️ 请确认商品确实是 **D200**。名字相近的 **D200X**（带旋钮）是不同型号，尚未测试。
+  - **D200H** 也可以使用：在 `config.json` 中加入 `"device": {"model": "d200h"}`（会调整宽格尺寸和输入差异）。
 - macOS（Apple Silicon）、Python 3.11+
 
 ## 🧩 功能
