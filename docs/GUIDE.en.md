@@ -32,6 +32,8 @@ You don't have to turn everything on. **LLM quotas and the pomodoro work right a
 | Item | Notes |
 |---|---|
 | **Ulanzi Stream Controller D200** | 13 keys plus one wide screen tile. Pick **the cheapest or any seller you like** from the [AliExpress search results](https://www.aliexpress.com/w/wholesale-ulanzi-d200.html); there's also the [Ulanzi store](https://www.ulanzi.com/products/stream-deck-d200). ⚠️ The similarly named **D200X** (with knobs) is a different model and has not been tested. The **D200H** works if you add `"device": {"model": "d200h"}` to `config.json`. |
+| **Elgato Stream Deck MK.2 / XL** | Experimental, hardware feedback welcome. Run `pip install -r requirements-elgato.txt` to enable auto-detection. The wide tile on the right spans keys 13 and 14. |
+| **Mirabox StreamDock (293 · 293V3 · 293S · 293SV3) / Ajazz AKP153** | Experimental, hardware feedback welcome. Auto-detection uses the standard dependencies. Check rotation and key order with `scripts/probe_mirabox.py`. |
 | **A Mac** | Tested on Apple Silicon. |
 | **USB cable** | Plug the included USB-C cable straight into your Mac. |
 
@@ -357,6 +359,9 @@ Everything lives in `config.json`. **Anything you leave out is turned off.** Res
 ```jsonc
 {
   "ui_lang": "auto",            // device & terminal language: "auto" (follows macOS), "en", "ko"
+  "device": {"driver": "auto"}, // detection order: D200/D200H, Elgato, Mirabox/Ajazz
+                                // for D200H, add "model": "d200h" to select its profile
+                                // manual selection: {"driver": "elgato"} or {"driver": "mirabox", "model": "293s"}
   "screensaver_min": 10,        // idle minutes before the screensaver (0 = off)
   "screensaver_scene": "aqua",  // screensaver scene: aqua · fire · rain · beach, or alternate
   "sound": {"enabled": false, "volume": 0.6},  // sound effects and ambience on the Mac speaker

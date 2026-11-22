@@ -41,6 +41,8 @@
   - ¹ アフィリエイトリンクです。このリンクから購入すると agentdeck を作っている Coldbyte に少額の手数料が入ります。価格は変わりません。
   - ⚠️ 商品が本当に **D200** かどうか確認してください。名前の似た **D200X**（ノブ付き）は別モデルで、動作確認していません。
   - **D200H** も使えます。`config.json` に `"device": {"model": "d200h"}` を追加してください（ワイドタイルのサイズと入力の違いを合わせます）。
+- **Elgato Stream Deck MK.2 / XL**（実験的な対応。実機でのフィードバック歓迎）。`pip install -r requirements-elgato.txt` でインストールすると自動検出されます。手動で選ぶ場合は `"device": {"driver": "elgato"}` を設定してください。右側のワイドタイルはキー 13 と 14 に分けて表示します。
+- **Mirabox StreamDock (293 · 293V3 · 293S · 293SV3) / Ajazz AKP153**（実験的な対応。実機でのフィードバック歓迎）。追加パッケージなしで自動検出されます。手動で選ぶ場合は `"device": {"driver": "mirabox", "model": "293s"}` のようにモデルを指定してください。画像の向きとキーの順番は `scripts/probe_mirabox.py` で確認できます。
 - macOS（Apple Silicon）、Python 3.11+
 
 ## 🧩 機能

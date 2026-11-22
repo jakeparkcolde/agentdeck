@@ -41,6 +41,8 @@ A macOS dashboard that drives the Ulanzi D200 directly, without the vendor app
   - ¹ Affiliate link: if you buy through it, Coldbyte (who makes agentdeck) earns a small commission at no extra cost to you.
   - ⚠️ Make sure the listing really is the **D200**. The similarly named **D200X** (with knobs) is a different model and hasn't been tested.
   - The **D200H** works too: add `"device": {"model": "d200h"}` to `config.json` (it adjusts the wide tile size and input quirks).
+- **Elgato Stream Deck MK.2 / XL** (experimental, hardware feedback welcome). Run `pip install -r requirements-elgato.txt` for auto-detection, or set `"device": {"driver": "elgato"}` after installing to select it directly. The wide tile on the right spans keys 13 and 14.
+- **Mirabox StreamDock (293 · 293V3 · 293S · 293SV3) / Ajazz AKP153** (experimental, hardware feedback welcome). Auto-detection uses the standard dependencies. To select a model directly, set `"device": {"driver": "mirabox", "model": "293s"}` with your model. Check rotation and key order with `scripts/probe_mirabox.py`.
 - macOS (Apple Silicon), Python 3.11+
 
 ## 🧩 Features

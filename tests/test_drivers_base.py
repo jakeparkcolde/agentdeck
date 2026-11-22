@@ -64,8 +64,10 @@ class OpenDeckTest(unittest.TestCase):
     def setUp(self):
         self.d200 = self.enterContext(mock.patch.object(drivers, "D200"))
         self.elgato = self.enterContext(mock.patch.object(drivers, "ElgatoDeck"))
+        self.mirabox = self.enterContext(mock.patch.object(drivers, "MiraboxDeck"))
         self.find_hid = self.enterContext(mock.patch.object(d200, "_find_hid", return_value=None))
         self.probe_elgato = self.enterContext(mock.patch.object(drivers, "probe_elgato", return_value=False))
+        self.probe_mirabox = self.enterContext(mock.patch.object(drivers, "probe_mirabox", return_value=False))
 
     def test_d200_explicit_driver_and_d200h_model(self):
         configs = (
@@ -98,6 +100,7 @@ class OpenDeckTest(unittest.TestCase):
         self.probe_elgato.return_value = True
         self.assertIs(drivers.open_deck({}), self.d200.return_value)
         self.probe_elgato.assert_not_called()
+        self.probe_mirabox.assert_not_called()
         self.elgato.assert_not_called()
 
     def test_auto_probes_elgato_and_falls_back_to_d200(self):
@@ -106,9 +109,32 @@ class OpenDeckTest(unittest.TestCase):
         self.assertIs(drivers.open_deck(cfg, reconnect=True), self.elgato.return_value)
         self.elgato.assert_called_once_with(cfg, reconnect=True)
         self.d200.assert_not_called()
+        self.probe_mirabox.assert_not_called()
         self.probe_elgato.return_value = False
         self.assertIs(drivers.open_deck(cfg, reconnect=True), self.d200.return_value)
         self.d200.assert_called_once_with(d200.load_profile(cfg), reconnect=True)
+
+    def test_mirabox_explicit_driver_and_akp153_model(self):
+        for cfg in ({"driver": "mirabox"}, {"model": "akp153"}):
+            with self.subTest(cfg=cfg):
+                self.assertIs(drivers.open_deck(cfg, reconnect=True), self.mirabox.return_value)
+                self.mirabox.assert_called_with(cfg, reconnect=True)
+        self.d200.assert_not_called()
+        self.elgato.assert_not_called()
+        self.find_hid.assert_not_called()
+        self.probe_elgato.assert_not_called()
+        self.probe_mirabox.assert_not_called()
+
+    def test_auto_selects_mirabox_when_d200_and_elgato_are_absent(self):
+        cfg = {"driver": "auto"}
+        self.probe_mirabox.return_value = True
+        self.assertIs(drivers.open_deck(cfg, reconnect=True), self.mirabox.return_value)
+        self.find_hid.assert_called_once_with()
+        self.probe_elgato.assert_called_once_with()
+        self.probe_mirabox.assert_called_once_with()
+        self.mirabox.assert_called_once_with(cfg, reconnect=True)
+        self.d200.assert_not_called()
+        self.elgato.assert_not_called()
 
     def test_default_config_uses_device_section(self):
         cfg = {"driver": "elgato", "serial": "fake-selected"}

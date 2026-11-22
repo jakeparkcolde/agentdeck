@@ -1,38 +1,79 @@
-"""페이지를 PNG 로 그려본다 (장치 없이). 사용: .venv/bin/python preview.py <출력폴더>"""
+"""Render page previews without hardware. Usage: preview.py [--device DEVICE] OUTPUT"""
 
 from __future__ import annotations
 
+import argparse
 import io
-import sys
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
+from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
 
-from d200 import FONT_PATH, render_icon
+import clock
+from d200 import FONT_PATH, ICON, Button, render_icon
 from dashboard import collect_llms
+from drivers.base import split_wide_png
+from drivers.mirabox import MIRABOX_PROFILES
 from pages import nav, page_grid, page_studio, page_summary
-from remote_herdr import studio_state
+from remote_herdr import TOWER_SPACE, studio_state
+
+KEY_SIZES = {"d200": ICON, "elgato": 72, "mirabox": MIRABOX_PROFILES["293s"].key_size[0]}
 
 
-def sheet(buttons, title: str, out: str) -> None:
-    pad, cell = 10, 196
-    img = Image.new("RGB", (5 * (cell + pad) + pad, 3 * (cell + pad) + pad + 40), "#000")
+def sheet(buttons: dict[int, Button], title: str, out: str | Path, device: str = "d200") -> None:
+    key_size = KEY_SIZES[device]
+    scale = 2 if device == "elgato" else 1
+    pad, cell = 10, key_size * scale
+    width = 5 * (cell + pad) + pad
+    if device == "d200":
+        width = max(width, 3 * (cell + pad) + clock.W + 2 * pad)
+    img = Image.new("RGB", (width, 3 * (cell + pad) + pad + 40), "black")
     d = ImageDraw.Draw(img)
     d.text((pad, 8), title, font=ImageFont.truetype(FONT_PATH, 24), fill="#c0caf5")
-    for i, b in buttons.items():
-        img.paste(Image.open(io.BytesIO(render_icon(b))), (pad + (i % 5) * (cell + pad), 40 + pad + (i // 5) * (cell + pad)))
-    x, y = pad + 3 * (cell + pad), 40 + pad + 2 * (cell + pad)
-    d.rounded_rectangle((x, y, x + 2 * cell + pad, y + cell), 16, fill="#0f0f14", outline="#2a2a3a")
-    d.text((x + cell + pad / 2, y + cell / 2), datetime.now().strftime("%H:%M  %m/%d"),
-           font=ImageFont.truetype(FONT_PATH, 48), fill="#c0caf5", anchor="mm")
+
+    def paste(slot: int, image: Image.Image) -> None:
+        row, col = divmod(slot, 5)
+        if scale != 1:
+            image = image.resize((cell, cell), Image.Resampling.NEAREST)
+        img.paste(image, (pad + col * (cell + pad), 40 + pad + row * (cell + pad)))
+
+    for slot, button in buttons.items():
+        if 0 <= slot < 13:
+            with Image.open(io.BytesIO(render_icon(button))) as source:
+                paste(slot, source.convert("RGB").resize((key_size, key_size), Image.Resampling.LANCZOS))
+
+    wide = clock.render_clock()
+    if device == "d200":
+        with Image.open(io.BytesIO(wide)) as source:
+            paste(13, source)
+    else:
+        left, right = split_wide_png(wide, (key_size, key_size))
+        paste(13, left)
+        paste(14, right)
     img.save(out)
 
 
-if __name__ == "__main__":
-    out = sys.argv[1]
+def main(argv: list[str] | None = None) -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--device", choices=tuple(KEY_SIZES), default="d200")
+    parser.add_argument("output", type=Path)
+    args = parser.parse_args(argv)
+    args.output.mkdir(parents=True, exist_ok=True)
+
     now = datetime.now(timezone.utc)
-    llms, studio = collect_llms(ThreadPoolExecutor(4)), studio_state()
-    sheet({**page_summary(llms, studio, now), **nav(1, 3, 80)}, "1 · 요약", f"{out}/p1.png")
-    sheet({**page_grid(llms, now), **nav(2, 3, 80)}, "2 · 한도 그리드", f"{out}/p2.png")
-    sheet({**page_studio(studio), **nav(3, 3, 80)}, "3 · 스튜디오 (Herdr 실데이터)", f"{out}/p3.png")
+    with ThreadPoolExecutor(4) as pool:
+        llms = collect_llms(pool)
+    studio = studio_state()
+    row = [workspace for workspace in studio.workspaces if workspace.name != TOWER_SPACE]
+    pages = (
+        ("1 · 요약", page_summary(llms, studio, now)),
+        ("2 · 한도 그리드", page_grid(llms, now)),
+        ("3 · 스튜디오 (Herdr 실데이터)", page_studio(studio, False, row)),
+    )
+    for page, (title, buttons) in enumerate(pages, start=1):
+        sheet({**buttons, **nav(page, 3, 80)}, title, args.output / f"p{page}.png", args.device)
+
+
+if __name__ == "__main__":
+    main()

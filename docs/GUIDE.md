@@ -32,6 +32,8 @@
 | 준비물 | 설명 |
 |---|---|
 | **Ulanzi Stream Controller D200** | 버튼 13개와 넓은 화면 칸이 있는 모델이에요. [알리익스프레스 검색 결과](https://ko.aliexpress.com/w/wholesale-ulanzi-%EC%8A%A4%ED%8A%B8%EB%A6%BC%EB%8D%B1.html)에서 **최저가나 마음에 드는 판매처**를 골라 사면 돼요. [Ulanzi 공식 스토어](https://www.ulanzi.com/products/stream-deck-d200)도 있어요. ⚠️ 이름이 비슷한 **D200X**(노브 포함)는 다른 모델이라 동작을 확인하지 않았습니다. **D200H**는 `config.json`에 `"device": {"model": "d200h"}`를 넣으면 쓸 수 있어요. |
+| **Elgato Stream Deck MK.2 / XL** | 실험적 지원이며 실기 피드백을 환영해요. `pip install -r requirements-elgato.txt`로 설치하면 자동 감지해요. 오른쪽 넓은 타일은 13·14번 키에 나눠 표시해요. |
+| **Mirabox StreamDock (293 · 293V3 · 293S · 293SV3) / Ajazz AKP153** | 실험적 지원이며 실기 피드백을 환영해요. 추가 패키지 없이 자동 감지해요. 회전과 키 순서는 `scripts/probe_mirabox.py`로 확인해요. |
 | **macOS 컴퓨터** | Apple Silicon 맥에서 테스트했어요. |
 | **USB 케이블** | 장치에 들어 있는 USB-C 케이블을 맥에 직접 연결하세요. |
 
@@ -357,6 +359,9 @@ Google Flow와 Higgsfield는 남은 크레딧을 **웹 화면에서만** 보여�
 ```jsonc
 {
   "ui_lang": "auto",            // 화면·안내 언어: "auto"(맥 언어 따라감), "ko", "en"
+  "device": {"driver": "auto"}, // D200/D200H, Elgato, Mirabox/Ajazz 순서로 감지
+                                // D200H는 "model": "d200h"를 추가해 프로필을 지정
+                                // 직접 선택: {"driver": "elgato"} 또는 {"driver": "mirabox", "model": "293s"}
   "screensaver_min": 10,        // 이 시간(분) 동안 입력이 없으면 화면보호기 (0 = 끔)
   "screensaver_scene": "aqua",  // 화면보호기 장면: aqua · fire · rain · beach, alternate = 켜질 때마다 차례로
   "sound": {"enabled": false, "volume": 0.6},  // 효과음·배경음 (덱이 연결된 맥 스피커)

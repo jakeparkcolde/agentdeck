@@ -1,7 +1,7 @@
 {
   "ui_lang": "auto",
   "device": {
-    "model": "d200"
+    "driver": "auto"
   },
   "agent_source": "hooks",
   "hooks": {
