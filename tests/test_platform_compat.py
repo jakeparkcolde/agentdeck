@@ -148,17 +148,40 @@ class WindowsHookTest(unittest.TestCase):
                 self.assertEqual(asked, [], "known app must not enumerate windows")
 
     def test_focus_unknown_app_raises_its_window(self):
-        """모르는 앱(예: Codex 앱 chatgpt)의 세션: 탭 찾기 없이 그 앱 창을 앞으로."""
+        """모르는 앱(예: Codex 앱 chatgpt)의 세션: 그 앱 창을 앞으로."""
         import hook_agents
 
-        d = {"platform": "win32", "agent": "codex", "title": "2026년 CTF 대회 조사", "pid": 10,
-             "app": "chatgpt", "app_pid": 12, "_ssh": None}
+        d = {"platform": "win32", "agent": "codex", "pid": 10, "app": "chatgpt", "app_pid": 12, "_ssh": None}
         with mock.patch.dict(hook_agents._sessions, {"local:a": d}, clear=True), \
-                mock.patch.object(pc, "select_terminal_tab") as sel, \
+                mock.patch.object(hook_agents, "_window_app") as wa, \
                 mock.patch.object(pc, "activate_pid", return_value=True) as act:
             self.assertTrue(hook_agents.focus_session("local:a"))
-        sel.assert_not_called()
+        wa.assert_not_called()  # 기록에 앱이 있으면 다시 찾지 않는다
         act.assert_called_once_with(12)
+
+    def test_focus_finds_app_at_press_time_when_record_has_none(self):
+        """기록에 앱이 비어 있으면 누를 때 에이전트 pid 에서 다시 찾는다. 못 찾으면 지금처럼 (앞으로 올 창 없음)."""
+        import hook_agents
+
+        d = {"platform": "win32", "agent": "codex", "pid": 10, "app": "", "app_pid": 0, "_ssh": None}
+        with mock.patch.dict(hook_agents._sessions, {"local:a": d}, clear=True), \
+                mock.patch.object(hook_agents, "_window_app", return_value=(12, "chatgpt")) as wa, \
+                mock.patch.object(pc, "activate_pid", return_value=True) as act:
+            self.assertTrue(hook_agents.focus_session("local:a"))
+        wa.assert_called_once_with(10)
+        act.assert_called_once_with(12)
+        with mock.patch.dict(hook_agents._sessions, {"local:a": d}, clear=True), \
+                mock.patch.object(hook_agents, "_window_app", return_value=(0, "")):
+            self.assertFalse(hook_agents.focus_session("local:a"))
+
+    def test_window_app_uses_hook_rule(self):
+        """대시보드의 _window_app 은 훅 파일의 규칙을 그대로 쓴다 (실제 프로세스: 이 테스트 프로세스)."""
+        import hook_agents
+
+        app_pid, app = hook_agents._window_app(os.getpid())
+        self.assertIsInstance(app_pid, int)
+        self.assertIsInstance(app, str)
+        self.assertEqual(hook_agents._window_app(0x7FFFFFF0), (0, ""))  # 없는 프로세스
 
     def test_hook_writes_windows_record(self):
         home = tempfile.mkdtemp()

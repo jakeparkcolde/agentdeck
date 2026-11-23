@@ -155,9 +155,33 @@ end tell''')
     return False
 
 
+_hook_mod = None
+
+
+def _window_app(pid: int) -> tuple[int, str]:
+    """Windows: 에이전트 pid 에서 위로 올라가 창을 가진 앱 (앱 pid, 종류). 훅과 같은 규칙 (hooks/agent_hook.py)."""
+    global _hook_mod
+    try:
+        if _hook_mod is None:
+            import importlib.util
+
+            path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "hooks", "agent_hook.py")
+            spec = importlib.util.spec_from_file_location("_agentdeck_hook", path)
+            mod = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(mod)
+            _hook_mod = mod
+        _, _, app_pid, app = _hook_mod._win_lineage(start=pid)
+        return app_pid, app
+    except Exception:
+        return 0, ""
+
+
 def _focus_windows(d: dict) -> bool:
     """Windows: VS Code · Cursor 는 그 프로젝트 창을 열고, 그 밖(Windows Terminal 등)은 세션이 도는 앱 창을 앞으로."""
     app, cwd, app_pid = d.get("app", ""), d.get("cwd", ""), int(d.get("app_pid") or 0)
+    if not app and not app_pid and d.get("pid"):
+        # 기록에 앱이 없다 (예전 훅이 쓴 기록, 또는 그때 창이 없었음): 지금 다시 찾는다
+        app_pid, app = _window_app(int(d["pid"]))
     if app in ("code", "cursor") and cwd and platform_compat.run_cli(app, cwd):
         return True
     return platform_compat.activate_pid(app_pid)

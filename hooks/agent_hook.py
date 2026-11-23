@@ -107,14 +107,15 @@ def _win_window_pids() -> set[int]:
     return pids
 
 
-def _win_lineage(window_pids=_win_window_pids) -> tuple[int, str, int, str]:
+def _win_lineage(window_pids=_win_window_pids, start: int = 0) -> tuple[int, str, int, str]:
     """(에이전트 pid, 이름, 창을 가진 앱 pid, 앱 종류). 못 찾으면 부모 pid 와 빈 값.
 
     앱 종류: 아는 앱(_WIN_APPS)이면 그 이름(terminal · code …). 모르는 앱이면 에이전트 위쪽에서
     보이는 창을 가진 첫 프로세스의 실행 파일 이름(예: Codex 앱 → chatgpt). 누르면 그 창을 앞으로 가져온다.
+    start: 여기서부터 올라간다 (기본: 훅의 부모. 대시보드는 기록된 에이전트 pid 를 넘긴다)
     """
     procs = _win_procs()
-    pid, seen = os.getppid(), set()
+    pid, seen = start or os.getppid(), set()
     agent_pid, agent_name, app_pid, app = 0, "", 0, ""
     above: list[tuple[int, str]] = []  # 에이전트부터 위로 (모르는 앱 찾기용)
     while pid and pid in procs and pid not in seen and len(seen) < 40:
