@@ -118,6 +118,48 @@ class WindowsHookTest(unittest.TestCase):
         self.assertNotIn(name, ("cmd.exe", "python.exe", "conhost.exe"))
         self.assertTrue(pc.pid_alive(pid))
 
+    def test_lineage_finds_unknown_windowed_app(self):
+        """목록에 없는 앱: 에이전트 위쪽에서 보이는 창을 가진 첫 조상을 앱으로 (창 없는 같은 이름 보조 프로세스는 건너뜀).
+        탐색기 등 시스템 프로세스에 닿으면 멈춘다. 아는 앱은 지금처럼 이름으로 찾고 창은 살피지 않는다."""
+        sys.path.insert(0, str(ROOT / "hooks"))
+        import agent_hook
+
+        procs = {
+            # Codex 데스크톱 앱: codex.exe → ChatGPT.exe(창 없음) → ChatGPT.exe(창) → sihost
+            10: (11, "codex.exe"), 11: (12, "chatgpt.exe"), 12: (13, "chatgpt.exe"), 13: (14, "sihost.exe"),
+            14: (0, "svchost.exe"),
+            # 탐색기에서 띄운 셸: 탐색기 창으로 가면 안 된다
+            20: (21, "claude.exe"), 21: (22, "pwsh.exe"), 22: (0, "explorer.exe"),
+            # Windows Terminal (아는 앱)
+            30: (31, "claude.exe"), 31: (32, "pwsh.exe"), 32: (22, "windowsterminal.exe"),
+            # 부모가 없는 백그라운드 codex.exe (터미널 Codex 의 작업 프로세스)
+            40: (0, "codex.exe"),
+        }
+        wins = {12, 22, 32}
+        cases = {10: (10, "codex.exe", 12, "chatgpt"), 20: (20, "claude.exe", 0, ""),
+                 30: (30, "claude.exe", 32, "terminal"), 40: (40, "codex.exe", 0, "")}
+        for start, want in cases.items():
+            asked = []
+            with mock.patch.object(agent_hook, "_win_procs", return_value=procs), \
+                    mock.patch.object(agent_hook.os, "getppid", return_value=start):
+                got = agent_hook._win_lineage(window_pids=lambda: asked.append(1) or wins)
+            self.assertEqual(got, want, start)
+            if start == 30:
+                self.assertEqual(asked, [], "known app must not enumerate windows")
+
+    def test_focus_unknown_app_raises_its_window(self):
+        """모르는 앱(예: Codex 앱 chatgpt)의 세션: 탭 찾기 없이 그 앱 창을 앞으로."""
+        import hook_agents
+
+        d = {"platform": "win32", "agent": "codex", "title": "2026년 CTF 대회 조사", "pid": 10,
+             "app": "chatgpt", "app_pid": 12, "_ssh": None}
+        with mock.patch.dict(hook_agents._sessions, {"local:a": d}, clear=True), \
+                mock.patch.object(pc, "select_terminal_tab") as sel, \
+                mock.patch.object(pc, "activate_pid", return_value=True) as act:
+            self.assertTrue(hook_agents.focus_session("local:a"))
+        sel.assert_not_called()
+        act.assert_called_once_with(12)
+
     def test_hook_writes_windows_record(self):
         home = tempfile.mkdtemp()
         env = {**os.environ, "HOME": home, "USERPROFILE": home}

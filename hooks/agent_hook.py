@@ -51,6 +51,10 @@ _WIN_PASS = {"bash.exe", "sh.exe", "dash.exe", "env.exe", "cmd.exe", "powershell
 _WIN_APPS = {"windowsterminal.exe": "terminal", "code.exe": "code", "code - insiders.exe": "code",
              "cursor.exe": "cursor", "windsurf.exe": "windsurf", "wezterm-gui.exe": "wezterm",
              "alacritty.exe": "alacritty", "idea64.exe": "idea", "pycharm64.exe": "pycharm"}
+# 목록에 없는 앱은 '보이는 창을 가진 첫 조상' 으로 찾는다. 이 시스템 프로세스에 닿으면 멈춘다
+# (탐색기도 창이 있지만 거기서 띄운 앱의 창이 아니다)
+_WIN_STOP = {"explorer.exe", "sihost.exe", "svchost.exe", "services.exe", "wininit.exe", "winlogon.exe",
+             "userinit.exe", "taskhostw.exe", "runtimebroker.exe", "dllhost.exe"}
 
 
 def _win_procs() -> dict[int, tuple[int, str]]:
@@ -83,11 +87,36 @@ def _win_procs() -> dict[int, tuple[int, str]]:
     return out
 
 
-def _win_lineage() -> tuple[int, str, int, str]:
-    """(에이전트 pid, 이름, 창을 가진 앱 pid, 앱 종류). 못 찾으면 부모 pid 와 빈 값."""
+def _win_window_pids() -> set[int]:
+    """Windows: 화면에 보이는 맨 위 창(제목 있음, 다른 창에 딸리지 않음)을 가진 프로세스들."""
+    import ctypes
+    from ctypes import wintypes
+
+    user32 = ctypes.windll.user32
+    pids: set[int] = set()
+
+    @ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
+    def each(hwnd, _):
+        if user32.IsWindowVisible(hwnd) and not user32.GetWindow(hwnd, 4) and user32.GetWindowTextLengthW(hwnd):
+            pid = wintypes.DWORD()
+            user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+            pids.add(pid.value)
+        return True
+
+    user32.EnumWindows(each, 0)
+    return pids
+
+
+def _win_lineage(window_pids=_win_window_pids) -> tuple[int, str, int, str]:
+    """(에이전트 pid, 이름, 창을 가진 앱 pid, 앱 종류). 못 찾으면 부모 pid 와 빈 값.
+
+    앱 종류: 아는 앱(_WIN_APPS)이면 그 이름(terminal · code …). 모르는 앱이면 에이전트 위쪽에서
+    보이는 창을 가진 첫 프로세스의 실행 파일 이름(예: Codex 앱 → chatgpt). 누르면 그 창을 앞으로 가져온다.
+    """
     procs = _win_procs()
     pid, seen = os.getppid(), set()
     agent_pid, agent_name, app_pid, app = 0, "", 0, ""
+    above: list[tuple[int, str]] = []  # 에이전트부터 위로 (모르는 앱 찾기용)
     while pid and pid in procs and pid not in seen and len(seen) < 40:
         seen.add(pid)
         parent, name = procs[pid]
@@ -98,9 +127,18 @@ def _win_lineage() -> tuple[int, str, int, str]:
             while parent in procs and procs[parent][1] == name and parent not in seen:
                 seen.add(parent)
                 pid, parent = parent, procs[parent][0]
-            app_pid, app = pid, _WIN_APPS[name]
-            break
+            return agent_pid, agent_name, pid, _WIN_APPS[name]
+        if agent_pid:
+            if name in _WIN_STOP:
+                break
+            above.append((pid, name))
         pid = parent
+    if above:
+        wins = window_pids()
+        for p, name in above:  # 창 없는 보조 프로세스(같은 이름)는 건너뛰고 창이 있는 첫 조상
+            if p in wins:
+                app_pid, app = p, name[:-4] if name.endswith(".exe") else name
+                break
     return agent_pid or os.getppid(), agent_name, app_pid, app
 
 
