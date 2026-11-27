@@ -44,6 +44,7 @@ Ulanzi D200을 공식 앱 없이 직접 제어하는 macOS 대시보드
 - **Elgato Stream Deck MK.2 / XL** (실험적 지원, 실기 피드백 환영) · `pip install -r requirements-elgato.txt`로 설치하면 자동 감지해요. 직접 선택하려면 `"device": {"driver": "elgato"}`를 넣으세요. 오른쪽 넓은 타일은 13·14번 키에 나눠 표시해요.
 - **Mirabox StreamDock (293 · 293V3 · 293S · 293SV3) / Ajazz AKP153** (실험적 지원, 실기 피드백 환영) · 추가 패키지 없이 자동 감지해요. 직접 선택하려면 `"device": {"driver": "mirabox", "model": "293s"}`처럼 모델을 지정하세요. 회전과 키 순서는 `scripts/probe_mirabox.py`로 확인해요.
 - macOS(Apple Silicon), Python 3.11 이상
+  - **Windows 10/11**에서도 돌아가요 → [가이드: Windows에서 쓰기](docs/GUIDE.md#2-5-windows에서-쓰기)
 
 ## 🧩 기능
 

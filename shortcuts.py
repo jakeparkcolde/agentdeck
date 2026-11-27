@@ -17,6 +17,7 @@ from urllib.parse import urlparse
 
 from PIL import Image, ImageChops, ImageColor, ImageDraw, ImageFont
 
+import platform_compat
 from config import CFG
 from d200 import Button
 import present
@@ -78,7 +79,7 @@ STATE = State()
 PALETTE = ("#7aa2f7", "#bb9af7", "#7dcfff", "#9ece6a", "#e0af68", "#ff9e64", "#f7768e", "#73daca")
 ICON = 196
 CARD, CARD_BOTTOM, NAME_FG, SUB_FG, NUM_FG = "#1f2335", "#16161e", "#eef1ff", "#9aa5ce", "#565f89"
-EMOJI_FONT = "/System/Library/Fonts/Apple Color Emoji.ttc"
+EMOJI_FONT = platform_compat.font_file("emoji")[0]  # macOS Apple Color Emoji, Windows Segoe UI Emoji
 PAD = 18
 
 

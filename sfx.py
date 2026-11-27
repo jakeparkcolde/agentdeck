@@ -16,10 +16,12 @@ import time
 import wave
 from pathlib import Path
 
+import platform_compat
 from config import CFG
 
 _CFG = CFG.get("sound") or {}
-ENABLED = bool(_CFG.get("enabled"))
+# 재생은 macOS afplay 전용이라 다른 OS 에선 설정을 켜도 끈다 (Windows 재생은 아직 안 만듦)
+ENABLED = bool(_CFG.get("enabled")) and platform_compat.IS_MAC
 VOLUME = float(_CFG.get("volume", 0.6))
 RATE = 22050
 VERSION = 6  # 소리를 바꾸면 올려서 캐시를 새로 만든다

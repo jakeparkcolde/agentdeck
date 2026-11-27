@@ -8,6 +8,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 
+import platform_compat
 from config import EXTERNAL_DRIVES_CFG, MACHINES_CFG
 
 # 외장 드라이브: (볼륨 이름, 연결된 컴퓨터 표시 이름) — 분리되면 경고 (config.json)
@@ -55,11 +56,14 @@ class Volume:
 
 
 def _probe(name: str, target: str | None) -> MachineStat:
-    cmd = ["bash", "-s"] if target is None else \
-        ["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=5", target, "bash", "-s"]
     try:
-        r = subprocess.run(cmd, input=PROBE, capture_output=True, text=True, timeout=25)
-        d = json.loads(r.stdout.strip().splitlines()[-1])
+        # 이 컴퓨터가 Windows · Linux 면 직접 잰다 (PROBE 는 macOS 용 bash 스크립트). 원격(ssh)은 맥이라고 본다
+        d = platform_compat.local_machine_stats() if target is None else None
+        if d is None:
+            cmd = ["bash", "-s"] if target is None else \
+                ["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=5", target, "bash", "-s"]
+            r = subprocess.run(cmd, input=PROBE, capture_output=True, text=True, timeout=25)
+            d = json.loads(r.stdout.strip().splitlines()[-1])
     except Exception:
         return MachineStat(name, False)
     total, avail = d["disk_total_kb"], d["disk_avail_kb"]

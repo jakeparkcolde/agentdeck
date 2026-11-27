@@ -44,6 +44,7 @@
 - **Elgato Stream Deck MK.2 / XL**（実験的な対応。実機でのフィードバック歓迎）。`pip install -r requirements-elgato.txt` でインストールすると自動検出されます。手動で選ぶ場合は `"device": {"driver": "elgato"}` を設定してください。右側のワイドタイルはキー 13 と 14 に分けて表示します。
 - **Mirabox StreamDock (293 · 293V3 · 293S · 293SV3) / Ajazz AKP153**（実験的な対応。実機でのフィードバック歓迎）。追加パッケージなしで自動検出されます。手動で選ぶ場合は `"device": {"driver": "mirabox", "model": "293s"}` のようにモデルを指定してください。画像の向きとキーの順番は `scripts/probe_mirabox.py` で確認できます。
 - macOS（Apple Silicon）、Python 3.11+
+  - **Windows 10/11** でも動きます → [Guide: Using it on Windows](docs/GUIDE.en.md#2-5-using-it-on-windows)
 
 ## 🧩 機能
 

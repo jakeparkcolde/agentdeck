@@ -25,6 +25,7 @@ from pathlib import Path
 
 from PIL import Image
 
+import platform_compat
 from config import CFG
 from d200 import Button
 
@@ -65,10 +66,7 @@ def open_target(target: str) -> bool:
     """시연 바로가기: 주소·앱·파일을 연다 (open 명령). 설정 파일에 사용자가 직접 적은 것만 연다."""
     if not target:
         return False
-    try:
-        return subprocess.run(["open", os.path.expanduser(target)], capture_output=True, timeout=10).returncode == 0
-    except (OSError, subprocess.SubprocessError):
-        return False
+    return platform_compat.open_target(target)  # macOS open · Windows startfile · Linux xdg-open
 
 
 # ---------- 녹음 ----------

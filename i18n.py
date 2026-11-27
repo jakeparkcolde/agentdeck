@@ -1,6 +1,6 @@
 """화면·터미널 문구 언어 (config.json 의 "ui_lang": "auto" | "ko" | "en").
 
-- "auto"(또는 생략): macOS 시스템 언어를 따른다. 한국어면 ko, 그 밖의 언어는 en.
+- "auto"(또는 생략): 시스템 표시 언어(macOS · Windows)를 따른다. 한국어면 ko, 그 밖의 언어는 en.
 - 기기 화면: 페이지 코드는 한국어로 문구를 만들고, 그리는 단계(render_icon·시계 패널)에서 tr() 로 바꾼다.
   숫자가 들어간 문구는 정규식, 나머지는 긴 문구부터 치환한다.
 - 터미널 안내·오류: t("한국어", "English") 로 두 언어를 나란히 적는다.
@@ -10,19 +10,15 @@ from __future__ import annotations
 
 import os
 import re
-import subprocess
+
+import platform_compat
 
 
 def system_lang() -> str:
-    """macOS 의 첫 번째 선호 언어가 한국어면 'ko', 아니면 'en'."""
-    try:
-        out = subprocess.run(["defaults", "read", "-g", "AppleLanguages"], capture_output=True,
-                             text=True, timeout=3).stdout
-        first = re.search(r'"?([A-Za-z]{2,3})[-_"\s]', out)
-        if first:
-            return "ko" if first[1].lower() == "ko" else "en"
-    except Exception:
-        pass
+    """시스템의 첫 번째 표시 언어가 한국어면 'ko', 아니면 'en'."""
+    code = platform_compat.ui_language()
+    if code:
+        return "ko" if code == "ko" else "en"
     env = os.environ.get("LC_ALL") or os.environ.get("LANG") or ""
     return "ko" if env.lower().startswith("ko") else "en"
 

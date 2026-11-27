@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import json
 import os
-import subprocess
 import time
 from dataclasses import asdict, dataclass
 
+import platform_compat
 from i18n import t
 
 STATE_PATH = os.path.expanduser("~/.cache/d200/pomodoro.json")
@@ -76,8 +76,7 @@ class Pomodoro:
 
 
 def notify_done(minutes: float) -> None:
-    """맥 알림 + 소리 3번."""
+    """데스크톱 알림 + 소리 (macOS: 알림 + Glass 3번, Windows: 토스트 + 알림음)."""
     msg = t(f"{minutes:.0f}분 집중 완료! 잠깐 쉬어가세요.", f"{minutes:.0f} min focus done! Take a short break.")
     title = t("뽀모도로", "Pomodoro")
-    subprocess.Popen(["osascript", "-e", f'display notification "{msg}" with title "{title}" sound name "Glass"'])
-    subprocess.Popen(["/bin/sh", "-c", "for i in 1 2 3; do afplay /System/Library/Sounds/Glass.aiff; done"])
+    platform_compat.notify(title, msg)
